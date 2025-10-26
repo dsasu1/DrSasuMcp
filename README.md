@@ -113,10 +113,13 @@ Add to your Claude Desktop configuration file:
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 **Mac:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 
+##### Option 1: Using `dotnet run` (Development)
+
 ```json
 {
   "mcpServers": {
     "drsasumcp": {
+     "type": "stdio",
       "command": "dotnet",
       "args": ["run", "--project", "C:\\Projects\\personal\\DrSasuMcp\\DrSasuMcp\\DrSasuMcp.csproj"],
       "env": {
@@ -131,6 +134,55 @@ Add to your Claude Desktop configuration file:
   }
 }
 ```
+
+##### Option 2: Using Compiled Executable (Production)
+
+First, publish the project:
+```bash
+dotnet publish -c Release -o ./publish
+```
+
+Then configure Claude Desktop:
+
+**Windows:**
+```json
+{
+  "mcpServers": {
+    "drsasumcp": {
+      "command": "C:\\Projects\\personal\\DrSasuMcp\\publish\\DrSasuMcp.exe",
+      "env": {
+        "SQL_CONNECTION_STRING": "Server=.;Database=YourDatabase;Trusted_Connection=True;TrustServerCertificate=True",
+        "API_DEFAULT_TIMEOUT": "30",
+        "API_MAX_TIMEOUT": "300",
+        "API_FOLLOW_REDIRECTS": "true",
+        "API_VALIDATE_SSL": "true",
+        "API_MAX_REDIRECTS": "10"
+      }
+    }
+  }
+}
+```
+
+**Mac/Linux:**
+```json
+{
+  "mcpServers": {
+    "drsasumcp": {
+      "command": "/path/to/DrSasuMcp/publish/DrSasuMcp",
+      "env": {
+        "SQL_CONNECTION_STRING": "Server=localhost;Database=YourDatabase;User Id=sa;Password=YourPassword;TrustServerCertificate=True",
+        "API_DEFAULT_TIMEOUT": "30",
+        "API_MAX_TIMEOUT": "300",
+        "API_FOLLOW_REDIRECTS": "true",
+        "API_VALIDATE_SSL": "true",
+        "API_MAX_REDIRECTS": "10"
+      }
+    }
+  }
+}
+```
+
+> **Note:** Using the compiled executable (Option 2) is recommended for production use as it starts faster and doesn't require the .NET SDK to be installed (only the .NET runtime).
 
 #### Environment Variables
 
