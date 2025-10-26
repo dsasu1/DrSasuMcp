@@ -6,6 +6,7 @@ using DrSasuMcp.Tools.API.Validators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -73,6 +74,72 @@ namespace DrSasuMcp.Tests.API
         }
 
         [Fact]
+        public void Constructor_WithEnvironmentVariables_ShouldReadConfiguration()
+        {
+            // Arrange - Set environment variables
+            Environment.SetEnvironmentVariable("API_DEFAULT_TIMEOUT", "60");
+            Environment.SetEnvironmentVariable("API_MAX_TIMEOUT", "600");
+            Environment.SetEnvironmentVariable("API_FOLLOW_REDIRECTS", "false");
+            Environment.SetEnvironmentVariable("API_VALIDATE_SSL", "false");
+            Environment.SetEnvironmentVariable("API_MAX_REDIRECTS", "20");
+
+            try
+            {
+                // Act - Create a new instance with environment variables set
+                var apiTool = new APITool(
+                    _mockHttpClientFactory.Object,
+                    _mockLogger.Object,
+                    _authHandlers,
+                    _validators
+                );
+
+                // Assert
+                apiTool.Should().NotBeNull();
+                
+                // Verify the logger was called with configuration values
+                _mockLogger.Invocations.Should().Contain(i => 
+                    i.Method.Name == "Log" && 
+                    i.Arguments[2].ToString().Contains("timeout=60"));
+            }
+            finally
+            {
+                // Cleanup - Remove environment variables
+                Environment.SetEnvironmentVariable("API_DEFAULT_TIMEOUT", null);
+                Environment.SetEnvironmentVariable("API_MAX_TIMEOUT", null);
+                Environment.SetEnvironmentVariable("API_FOLLOW_REDIRECTS", null);
+                Environment.SetEnvironmentVariable("API_VALIDATE_SSL", null);
+                Environment.SetEnvironmentVariable("API_MAX_REDIRECTS", null);
+            }
+        }
+
+        [Fact]
+        public void Constructor_WithoutEnvironmentVariables_ShouldUseDefaults()
+        {
+            // Arrange - Ensure environment variables are not set
+            Environment.SetEnvironmentVariable("API_DEFAULT_TIMEOUT", null);
+            Environment.SetEnvironmentVariable("API_MAX_TIMEOUT", null);
+            Environment.SetEnvironmentVariable("API_FOLLOW_REDIRECTS", null);
+            Environment.SetEnvironmentVariable("API_VALIDATE_SSL", null);
+            Environment.SetEnvironmentVariable("API_MAX_REDIRECTS", null);
+
+            // Act
+            var apiTool = new APITool(
+                _mockHttpClientFactory.Object,
+                _mockLogger.Object,
+                _authHandlers,
+                _validators
+            );
+
+            // Assert
+            apiTool.Should().NotBeNull();
+            
+            // Verify defaults are used (timeout=30 by default)
+            _mockLogger.Invocations.Should().Contain(i => 
+                i.Method.Name == "Log" && 
+                i.Arguments[2].ToString().Contains("timeout=30"));
+        }
+
+        [Fact]
         public void ParseJsonPath_WithValidJson_ShouldExtractValue()
         {
             // Arrange
@@ -122,4 +189,3 @@ namespace DrSasuMcp.Tests.API
         }
     }
 }
-

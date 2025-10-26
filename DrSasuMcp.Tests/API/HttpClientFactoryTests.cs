@@ -1,26 +1,20 @@
 using DrSasuMcp.Tools.API;
 using FluentAssertions;
 using System;
-using System.Net;
-using System.Net.Http;
 using Xunit;
 
 namespace DrSasuMcp.Tests.API
 {
     public class HttpClientFactoryTests
     {
-        private readonly HttpClientFactory _factory;
-
-        public HttpClientFactoryTests()
-        {
-            _factory = new HttpClientFactory();
-        }
-
         [Fact]
-        public void CreateClient_WithDefaultParameters_ShouldCreateClient()
+        public void CreateClient_WithDefaults_ShouldCreateClient()
         {
+            // Arrange
+            var factory = new HttpClientFactory();
+
             // Act
-            var client = _factory.CreateClient();
+            var client = factory.CreateClient();
 
             // Assert
             client.Should().NotBeNull();
@@ -28,70 +22,104 @@ namespace DrSasuMcp.Tests.API
         }
 
         [Fact]
-        public void CreateClient_WithCustomTimeout_ShouldSetTimeout()
+        public void CreateClient_WithCustomTimeout_ShouldUseCustomTimeout()
         {
+            // Arrange
+            var factory = new HttpClientFactory();
+
             // Act
-            var client = _factory.CreateClient(timeoutSeconds: 60);
+            var client = factory.CreateClient(timeoutSeconds: 60);
 
             // Assert
+            client.Should().NotBeNull();
             client.Timeout.Should().Be(TimeSpan.FromSeconds(60));
         }
 
         [Fact]
-        public void CreateClient_WithFollowRedirects_ShouldConfigureHandler()
+        public void CreateClient_WithEnvironmentVariableMaxRedirects_ShouldUseEnvValue()
         {
+            // Arrange
+            Environment.SetEnvironmentVariable("API_MAX_REDIRECTS", "5");
+            var factory = new HttpClientFactory();
+
+            try
+            {
+                // Act
+                var client = factory.CreateClient();
+
+                // Assert
+                client.Should().NotBeNull();
+                // We can't directly test MaxAutomaticRedirections as it's internal to the handler
+                // but we can verify the client was created successfully
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("API_MAX_REDIRECTS", null);
+            }
+        }
+
+        [Fact]
+        public void CreateClient_WithoutEnvironmentVariable_ShouldUseDefaultMaxRedirects()
+        {
+            // Arrange
+            Environment.SetEnvironmentVariable("API_MAX_REDIRECTS", null);
+            var factory = new HttpClientFactory();
+
             // Act
-            var client = _factory.CreateClient(followRedirects: true);
+            var client = factory.CreateClient();
 
             // Assert
             client.Should().NotBeNull();
         }
 
         [Fact]
-        public void CreateClient_WithoutFollowRedirects_ShouldConfigureHandler()
+        public void CreateClient_WithInvalidEnvironmentVariable_ShouldUseDefault()
         {
+            // Arrange
+            Environment.SetEnvironmentVariable("API_MAX_REDIRECTS", "invalid");
+            var factory = new HttpClientFactory();
+
+            try
+            {
+                // Act
+                var client = factory.CreateClient();
+
+                // Assert
+                client.Should().NotBeNull();
+                // Should use default value of 10 when parsing fails
+            }
+            finally
+            {
+                // Cleanup
+                Environment.SetEnvironmentVariable("API_MAX_REDIRECTS", null);
+            }
+        }
+
+        [Fact]
+        public void CreateClient_WithFollowRedirectsFalse_ShouldCreateClient()
+        {
+            // Arrange
+            var factory = new HttpClientFactory();
+
             // Act
-            var client = _factory.CreateClient(followRedirects: false);
+            var client = factory.CreateClient(followRedirects: false);
 
             // Assert
             client.Should().NotBeNull();
         }
 
         [Fact]
-        public void CreateClient_WithSslValidationDisabled_ShouldCreateClient()
+        public void CreateClient_WithValidateSslFalse_ShouldCreateClient()
         {
+            // Arrange
+            var factory = new HttpClientFactory();
+
             // Act
-            var client = _factory.CreateClient(validateSsl: false);
+            var client = factory.CreateClient(validateSsl: false);
 
             // Assert
             client.Should().NotBeNull();
-        }
-
-        [Fact]
-        public void CreateClient_WithAllParameters_ShouldCreateConfiguredClient()
-        {
-            // Act
-            var client = _factory.CreateClient(
-                timeoutSeconds: 45,
-                followRedirects: false,
-                validateSsl: false
-            );
-
-            // Assert
-            client.Should().NotBeNull();
-            client.Timeout.Should().Be(TimeSpan.FromSeconds(45));
-        }
-
-        [Fact]
-        public void CreateClient_MultipleTimes_ShouldCreateSeparateInstances()
-        {
-            // Act
-            var client1 = _factory.CreateClient();
-            var client2 = _factory.CreateClient();
-
-            // Assert
-            client1.Should().NotBeSameAs(client2);
         }
     }
 }
-

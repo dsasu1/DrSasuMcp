@@ -22,6 +22,13 @@ namespace DrSasuMcp.Tools.API
         private readonly ILogger<APITool> _logger;
         private readonly Dictionary<AuthType, IAuthenticationHandler> _authHandlers;
         private readonly Dictionary<ValidationType, IResponseValidator> _validators;
+        
+        // Configuration values (can be overridden by environment variables)
+        private readonly int _defaultTimeoutSeconds;
+        private readonly int _maxTimeoutSeconds;
+        private readonly bool _defaultFollowRedirects;
+        private readonly bool _defaultValidateSsl;
+        private readonly int _defaultMaxRedirects;
 
         public APITool(
             IHttpClientFactory httpClientFactory,
@@ -33,6 +40,33 @@ namespace DrSasuMcp.Tools.API
             _logger = logger;
             _authHandlers = authHandlers.ToDictionary(h => h.SupportedType);
             _validators = validators.ToDictionary(v => v.SupportedType);
+            
+            // Read configuration from environment variables or use defaults
+            _defaultTimeoutSeconds = GetIntFromEnv(EnvApiDefaultTimeout, DefaultTimeoutSeconds);
+            _maxTimeoutSeconds = GetIntFromEnv(EnvApiMaxTimeout, MaxTimeoutSeconds);
+            _defaultFollowRedirects = GetBoolFromEnv(EnvApiFollowRedirects, DefaultFollowRedirects);
+            _defaultValidateSsl = GetBoolFromEnv(EnvApiValidateSsl, DefaultValidateSsl);
+            _defaultMaxRedirects = GetIntFromEnv(EnvApiMaxRedirects, DefaultMaxRedirects);
+            
+            _logger.LogInformation("API Tool initialized with timeout={Timeout}s, maxTimeout={MaxTimeout}s, followRedirects={FollowRedirects}, validateSsl={ValidateSsl}, maxRedirects={MaxRedirects}",
+                _defaultTimeoutSeconds, _maxTimeoutSeconds, _defaultFollowRedirects, _defaultValidateSsl, _defaultMaxRedirects);
+        }
+        
+        private static int GetIntFromEnv(string varName, int defaultValue)
+        {
+            var value = Environment.GetEnvironmentVariable(varName);
+            return int.TryParse(value, out var result) ? result : defaultValue;
+        }
+        
+        private static bool GetBoolFromEnv(string varName, bool defaultValue)
+        {
+            var value = Environment.GetEnvironmentVariable(varName);
+            if (string.IsNullOrEmpty(value))
+                return defaultValue;
+                
+            return value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+                   value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+                   value.Equals("yes", StringComparison.OrdinalIgnoreCase);
         }
 
         #region HTTP Request Methods
@@ -48,9 +82,9 @@ namespace DrSasuMcp.Tools.API
             [Description("Optional headers as JSON object")] string? headers = null,
             [Description("Optional query parameters as JSON object")] string? queryParams = null,
             [Description("Optional authentication config as JSON")] string? auth = null,
-            [Description("Request timeout in seconds")] int timeoutSeconds = DefaultTimeoutSeconds,
-            [Description("Follow redirects")] bool followRedirects = DefaultFollowRedirects,
-            [Description("Validate SSL certificates")] bool validateSsl = DefaultValidateSsl)
+            [Description("Request timeout in seconds")] int timeoutSeconds = 0,
+            [Description("Follow redirects")] bool? followRedirects = null,
+            [Description("Validate SSL certificates")] bool? validateSsl = null)
         {
             return await ExecuteHttpRequest(
                 HttpMethod.Get,
@@ -60,9 +94,9 @@ namespace DrSasuMcp.Tools.API
                 headers,
                 queryParams,
                 auth,
-                timeoutSeconds,
-                followRedirects,
-                validateSsl);
+                timeoutSeconds > 0 ? timeoutSeconds : _defaultTimeoutSeconds,
+                followRedirects ?? _defaultFollowRedirects,
+                validateSsl ?? _defaultValidateSsl);
         }
 
         [McpServerTool(
@@ -78,9 +112,9 @@ namespace DrSasuMcp.Tools.API
             [Description("Optional headers as JSON object")] string? headers = null,
             [Description("Optional query parameters as JSON object")] string? queryParams = null,
             [Description("Optional authentication config as JSON")] string? auth = null,
-            [Description("Request timeout in seconds")] int timeoutSeconds = DefaultTimeoutSeconds,
-            [Description("Follow redirects")] bool followRedirects = DefaultFollowRedirects,
-            [Description("Validate SSL certificates")] bool validateSsl = DefaultValidateSsl)
+            [Description("Request timeout in seconds")] int timeoutSeconds = 0,
+            [Description("Follow redirects")] bool? followRedirects = null,
+            [Description("Validate SSL certificates")] bool? validateSsl = null)
         {
             return await ExecuteHttpRequest(
                 HttpMethod.Post,
@@ -90,9 +124,9 @@ namespace DrSasuMcp.Tools.API
                 headers,
                 queryParams,
                 auth,
-                timeoutSeconds,
-                followRedirects,
-                validateSsl);
+                timeoutSeconds > 0 ? timeoutSeconds : _defaultTimeoutSeconds,
+                followRedirects ?? _defaultFollowRedirects,
+                validateSsl ?? _defaultValidateSsl);
         }
 
         [McpServerTool(
@@ -108,9 +142,9 @@ namespace DrSasuMcp.Tools.API
             [Description("Optional headers as JSON object")] string? headers = null,
             [Description("Optional query parameters as JSON object")] string? queryParams = null,
             [Description("Optional authentication config as JSON")] string? auth = null,
-            [Description("Request timeout in seconds")] int timeoutSeconds = DefaultTimeoutSeconds,
-            [Description("Follow redirects")] bool followRedirects = DefaultFollowRedirects,
-            [Description("Validate SSL certificates")] bool validateSsl = DefaultValidateSsl)
+            [Description("Request timeout in seconds")] int timeoutSeconds = 0,
+            [Description("Follow redirects")] bool? followRedirects = null,
+            [Description("Validate SSL certificates")] bool? validateSsl = null)
         {
             return await ExecuteHttpRequest(
                 HttpMethod.Put,
@@ -120,9 +154,9 @@ namespace DrSasuMcp.Tools.API
                 headers,
                 queryParams,
                 auth,
-                timeoutSeconds,
-                followRedirects,
-                validateSsl);
+                timeoutSeconds > 0 ? timeoutSeconds : _defaultTimeoutSeconds,
+                followRedirects ?? _defaultFollowRedirects,
+                validateSsl ?? _defaultValidateSsl);
         }
 
         [McpServerTool(
@@ -138,9 +172,9 @@ namespace DrSasuMcp.Tools.API
             [Description("Optional headers as JSON object")] string? headers = null,
             [Description("Optional query parameters as JSON object")] string? queryParams = null,
             [Description("Optional authentication config as JSON")] string? auth = null,
-            [Description("Request timeout in seconds")] int timeoutSeconds = DefaultTimeoutSeconds,
-            [Description("Follow redirects")] bool followRedirects = DefaultFollowRedirects,
-            [Description("Validate SSL certificates")] bool validateSsl = DefaultValidateSsl)
+            [Description("Request timeout in seconds")] int timeoutSeconds = 0,
+            [Description("Follow redirects")] bool? followRedirects = null,
+            [Description("Validate SSL certificates")] bool? validateSsl = null)
         {
             return await ExecuteHttpRequest(
                 HttpMethod.Patch,
@@ -150,9 +184,9 @@ namespace DrSasuMcp.Tools.API
                 headers,
                 queryParams,
                 auth,
-                timeoutSeconds,
-                followRedirects,
-                validateSsl);
+                timeoutSeconds > 0 ? timeoutSeconds : _defaultTimeoutSeconds,
+                followRedirects ?? _defaultFollowRedirects,
+                validateSsl ?? _defaultValidateSsl);
         }
 
         [McpServerTool(
@@ -166,9 +200,9 @@ namespace DrSasuMcp.Tools.API
             [Description("Optional headers as JSON object")] string? headers = null,
             [Description("Optional query parameters as JSON object")] string? queryParams = null,
             [Description("Optional authentication config as JSON")] string? auth = null,
-            [Description("Request timeout in seconds")] int timeoutSeconds = DefaultTimeoutSeconds,
-            [Description("Follow redirects")] bool followRedirects = DefaultFollowRedirects,
-            [Description("Validate SSL certificates")] bool validateSsl = DefaultValidateSsl)
+            [Description("Request timeout in seconds")] int timeoutSeconds = 0,
+            [Description("Follow redirects")] bool? followRedirects = null,
+            [Description("Validate SSL certificates")] bool? validateSsl = null)
         {
             return await ExecuteHttpRequest(
                 HttpMethod.Delete,
@@ -178,9 +212,9 @@ namespace DrSasuMcp.Tools.API
                 headers,
                 queryParams,
                 auth,
-                timeoutSeconds,
-                followRedirects,
-                validateSsl);
+                timeoutSeconds > 0 ? timeoutSeconds : _defaultTimeoutSeconds,
+                followRedirects ?? _defaultFollowRedirects,
+                validateSsl ?? _defaultValidateSsl);
         }
 
         [McpServerTool(
@@ -193,8 +227,8 @@ namespace DrSasuMcp.Tools.API
             [Description("The URL to send the request to")] string url,
             [Description("Optional headers as JSON object")] string? headers = null,
             [Description("Optional authentication config as JSON")] string? auth = null,
-            [Description("Request timeout in seconds")] int timeoutSeconds = DefaultTimeoutSeconds,
-            [Description("Validate SSL certificates")] bool validateSsl = DefaultValidateSsl)
+            [Description("Request timeout in seconds")] int timeoutSeconds = 0,
+            [Description("Validate SSL certificates")] bool? validateSsl = null)
         {
             return await ExecuteHttpRequest(
                 HttpMethod.Head,
@@ -204,9 +238,9 @@ namespace DrSasuMcp.Tools.API
                 headers,
                 queryParamsJson: null,
                 auth,
-                timeoutSeconds,
+                timeoutSeconds > 0 ? timeoutSeconds : _defaultTimeoutSeconds,
                 followRedirects: false,
-                validateSsl);
+                validateSsl ?? _defaultValidateSsl);
         }
 
         [McpServerTool(
@@ -219,8 +253,8 @@ namespace DrSasuMcp.Tools.API
             [Description("The URL to send the request to")] string url,
             [Description("Optional headers as JSON object")] string? headers = null,
             [Description("Optional authentication config as JSON")] string? auth = null,
-            [Description("Request timeout in seconds")] int timeoutSeconds = DefaultTimeoutSeconds,
-            [Description("Validate SSL certificates")] bool validateSsl = DefaultValidateSsl)
+            [Description("Request timeout in seconds")] int timeoutSeconds = 0,
+            [Description("Validate SSL certificates")] bool? validateSsl = null)
         {
             return await ExecuteHttpRequest(
                 HttpMethod.Options,
@@ -230,9 +264,9 @@ namespace DrSasuMcp.Tools.API
                 headers,
                 queryParamsJson: null,
                 auth,
-                timeoutSeconds,
+                timeoutSeconds > 0 ? timeoutSeconds : _defaultTimeoutSeconds,
                 followRedirects: false,
-                validateSsl);
+                validateSsl ?? _defaultValidateSsl);
         }
 
         #endregion
@@ -256,7 +290,7 @@ namespace DrSasuMcp.Tools.API
             [Description("Validation rules as JSON array")] string? validationRules = null,
             [Description("Expected status code")] int? expectedStatus = null,
             [Description("Maximum response time in milliseconds")] int? maxResponseTimeMs = null,
-            [Description("Request timeout in seconds")] int timeoutSeconds = DefaultTimeoutSeconds)
+            [Description("Request timeout in seconds")] int timeoutSeconds = 0)
         {
             try
             {
@@ -272,9 +306,9 @@ namespace DrSasuMcp.Tools.API
                     headers,
                     queryParams,
                     auth,
-                    timeoutSeconds,
-                    DefaultFollowRedirects,
-                    DefaultValidateSsl);
+                    timeoutSeconds > 0 ? timeoutSeconds : _defaultTimeoutSeconds,
+                    _defaultFollowRedirects,
+                    _defaultValidateSsl);
 
                 if (!requestResult.Success)
                 {
@@ -383,9 +417,9 @@ namespace DrSasuMcp.Tools.API
                         testConfig.Headers != null ? JsonSerializer.Serialize(testConfig.Headers) : null,
                         testConfig.QueryParameters != null ? JsonSerializer.Serialize(testConfig.QueryParameters) : null,
                         testConfig.Authentication != null ? JsonSerializer.Serialize(testConfig.Authentication) : null,
-                        DefaultTimeoutSeconds,
-                        DefaultFollowRedirects,
-                        DefaultValidateSsl);
+                        _defaultTimeoutSeconds,
+                        _defaultFollowRedirects,
+                        _defaultValidateSsl);
 
                     if (!requestResult.Success)
                     {
@@ -546,9 +580,9 @@ namespace DrSasuMcp.Tools.API
                     headersJson: null,
                     queryParamsJson: null,
                     auth,
-                    DefaultTimeoutSeconds,
+                    _defaultTimeoutSeconds,
                     followRedirects: false,
-                    DefaultValidateSsl);
+                    _defaultValidateSsl);
 
                 if (!requestResult.Success)
                 {
