@@ -2,6 +2,8 @@
 using DrSasuMcp.Tools.API;
 using DrSasuMcp.Tools.API.Authentication;
 using DrSasuMcp.Tools.API.Validators;
+using DrSasuMcp.Tools.AzureDevOps;
+using DrSasuMcp.Tools.AzureDevOps.Analyzers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -46,6 +48,18 @@ namespace DrSasuMcp
             
             // API Tool
             _ = builder.Services.AddSingleton<APITool>();
+
+            // Register Azure DevOps Tool dependencies
+            _ = builder.Services.AddSingleton<IAzureDevOpsService, AzureDevOpsService>();
+            _ = builder.Services.AddSingleton<IDiffService, DiffService>();
+            
+            // Code Analyzers
+            _ = builder.Services.AddSingleton<ICodeAnalyzer, SecurityAnalyzer>();
+            _ = builder.Services.AddSingleton<ICodeAnalyzer, CodeQualityAnalyzer>();
+            _ = builder.Services.AddSingleton<ICodeAnalyzer, BestPracticesAnalyzer>();
+            
+            // Azure DevOps Tool
+            _ = builder.Services.AddSingleton<AzureDevOpsTool>();
 
             builder.Services
                 .AddMcpServer()

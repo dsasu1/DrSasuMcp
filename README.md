@@ -8,7 +8,7 @@
 
 ## 🌟 Overview
 
-DrSasuMcp brings **SQL Server database management** and **HTTP API testing** directly into your AI assistant conversations. Execute queries, manage schemas, test APIs, and validate responses—all through natural language commands.
+DrSasuMcp brings **SQL Server database management**, **HTTP API testing**, and **Azure DevOps PR review** directly into your AI assistant conversations. Execute queries, manage schemas, test APIs, review pull requests, and validate code—all through natural language commands.
 
 ### Why DrSasuMcp?
 
@@ -75,6 +75,43 @@ Full-featured HTTP API testing—a Postman alternative in your AI workflow:
 
 [📖 API Tool Documentation](DrSasuMcp/Tools/API/README.md)
 
+### 🔍 Azure DevOps PR Review Tool
+
+Automated code review for Azure DevOps Pull Requests with security, quality, and best practice analysis:
+
+- **Pull Request Analysis**
+  - Fetch PR metadata, file changes, and diffs
+  - Support for all Azure DevOps PR URLs
+  - Line-by-line change tracking with DiffPlex integration
+  
+- **Security Analysis (10 checks)**
+  - Hardcoded credentials detection (passwords, API keys, tokens)
+  - SQL injection vulnerability detection
+  - Weak cryptography usage (MD5, SHA1)
+  - XSS vulnerabilities and dangerous patterns
+  - Process execution and path traversal checks
+  
+- **Code Quality Analysis (8 checks)**
+  - File and method length validation
+  - Cyclomatic complexity detection
+  - Magic number identification
+  - Naming convention validation
+  - TODO/FIXME comment tracking
+  
+- **Best Practices Analysis (13 checks)**
+  - Empty catch block detection
+  - Async/await pattern validation
+  - Resource management (IDisposable, using statements)
+  - Exception handling best practices
+  - HttpClient instantiation patterns
+  
+- **Multiple Diff Formats**
+  - Unified diff (traditional patch format)
+  - Side-by-side diff (visual comparison)
+  - Inline diff with change statistics
+
+[📖 Azure DevOps Tool Documentation](DrSasuMcp/Tools/AzureDevOps/README.md) | [🚀 Quick Start Guide](DrSasuMcp/Tools/AzureDevOps/QUICKSTART.md)
+
 ---
 
 ## 🚀 Quick Start
@@ -83,6 +120,7 @@ Full-featured HTTP API testing—a Postman alternative in your AI workflow:
 
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
 - SQL Server (for SQL tool features)
+- Azure DevOps account with Personal Access Token (for Azure DevOps tool features)
 - MCP-compatible AI assistant (Claude Desktop, VS Code with MCP, etc.)
 
 ### Installation
@@ -128,7 +166,8 @@ Add to your Claude Desktop configuration file:
         "API_MAX_TIMEOUT": "300",
         "API_FOLLOW_REDIRECTS": "true",
         "API_VALIDATE_SSL": "true",
-        "API_MAX_REDIRECTS": "10"
+        "API_MAX_REDIRECTS": "10",
+        "AZURE_DEVOPS_PAT": "your_azure_devops_personal_access_token"
       }
     }
   }
@@ -156,7 +195,8 @@ Then configure Claude Desktop:
         "API_MAX_TIMEOUT": "300",
         "API_FOLLOW_REDIRECTS": "true",
         "API_VALIDATE_SSL": "true",
-        "API_MAX_REDIRECTS": "10"
+        "API_MAX_REDIRECTS": "10",
+        "AZURE_DEVOPS_PAT": "your_azure_devops_personal_access_token"
       }
     }
   }
@@ -175,7 +215,8 @@ Then configure Claude Desktop:
         "API_MAX_TIMEOUT": "300",
         "API_FOLLOW_REDIRECTS": "true",
         "API_VALIDATE_SSL": "true",
-        "API_MAX_REDIRECTS": "10"
+        "API_MAX_REDIRECTS": "10",
+        "AZURE_DEVOPS_PAT": "your_azure_devops_personal_access_token"
       }
     }
   }
@@ -214,6 +255,29 @@ export API_MAX_REDIRECTS="10"
 
 > **Note:** If API environment variables are not set, the tool will use sensible defaults. These values can also be overridden per-request through method parameters.
 
+**Azure DevOps Tool Configuration (Required for PR reviews):**
+```bash
+# Windows PowerShell
+$env:AZURE_DEVOPS_PAT = "your_personal_access_token"
+$env:AZURE_DEVOPS_ORG = "your_organization"      # Optional
+$env:AZURE_DEVOPS_MAX_FILES = "100"              # Optional (default: 100)
+$env:AZURE_DEVOPS_TIMEOUT = "60"                 # Optional (default: 60)
+
+# Linux/Mac
+export AZURE_DEVOPS_PAT="your_personal_access_token"
+export AZURE_DEVOPS_ORG="your_organization"
+export AZURE_DEVOPS_MAX_FILES="100"
+export AZURE_DEVOPS_TIMEOUT="60"
+```
+
+**Setting up Azure DevOps Personal Access Token:**
+1. Go to Azure DevOps → User Settings → Personal Access Tokens
+2. Click "New Token"
+3. Set required scopes: **Code (Read)** and **Pull Request Threads (Read)**
+4. Copy the token and set it as an environment variable
+
+> **Note:** The Azure DevOps PAT is required to use PR review features. Other environment variables are optional with sensible defaults.
+
 ---
 
 ## 💡 Usage Examples
@@ -250,6 +314,22 @@ You: "Run a complete test suite on my API endpoints"
 AI: Executes multiple tests with detailed pass/fail reporting
 ```
 
+### Azure DevOps PR Review
+
+```
+You: "Review this PR: https://dev.azure.com/myorg/myproject/_git/myrepo/pullrequest/123"
+AI: Analyzes PR with security, quality, and best practice checks
+
+You: "Check PR 456 for security vulnerabilities"
+AI: Runs security analysis and reports hardcoded secrets, SQL injection risks, etc.
+
+You: "Show me the diff for AuthService.cs in PR 789"
+AI: Displays unified diff with line-by-line changes
+
+You: "What changed in this PR and are there any critical issues?"
+AI: Provides PR summary with file changes and prioritized issue list
+```
+
 ---
 
 ## 🏗️ Architecture
@@ -266,15 +346,24 @@ DrSasuMcp/
     │   ├── ISqlConnectionFactory.cs
     │   ├── SqlConnectionFactory.cs
     │   └── README.md            # SQL tool documentation
-    └── API/
-        ├── APITool.cs           # MCP-exposed API operations
-        ├── APIToolConstants.cs  # API configuration constants
-        ├── IHttpClientFactory.cs
-        ├── HttpClientFactory.cs
-        ├── Models/              # Request/Response models
-        ├── Authentication/      # Auth handlers (Bearer, Basic, API Key)
-        ├── Validators/          # Response validators
-        └── README.md            # API tool documentation
+    ├── API/
+    │   ├── APITool.cs           # MCP-exposed API operations
+    │   ├── APIToolConstants.cs  # API configuration constants
+    │   ├── IHttpClientFactory.cs
+    │   ├── HttpClientFactory.cs
+    │   ├── Models/              # Request/Response models
+    │   ├── Authentication/      # Auth handlers (Bearer, Basic, API Key)
+    │   ├── Validators/          # Response validators
+    │   └── README.md            # API tool documentation
+    └── AzureDevOps/
+        ├── AzureDevOpsTool.cs   # MCP-exposed PR review operations
+        ├── AzureDevOpsService.cs # Azure DevOps REST API client
+        ├── DiffService.cs       # DiffPlex integration for diffs
+        ├── Models/              # PR, FileChange, ReviewComment models
+        ├── Analyzers/           # Security, Quality, BestPractices
+        ├── Utils/               # PR URL parser
+        ├── README.md            # Azure DevOps tool documentation
+        └── QUICKSTART.md        # Quick start guide
 ```
 
 ### Design Principles
@@ -338,6 +427,8 @@ public class MyNewTool
 
 - **[SQL Tool Documentation](DrSasuMcp/Tools/SQL/README.md)** - Complete guide to database operations
 - **[API Tool Documentation](DrSasuMcp/Tools/API/README.md)** - Complete guide to API testing
+- **[Azure DevOps Tool Documentation](DrSasuMcp/Tools/AzureDevOps/README.md)** - Complete guide to PR reviews
+- **[Azure DevOps Quick Start](DrSasuMcp/Tools/AzureDevOps/QUICKSTART.md)** - 5-minute setup guide
 - **[MCP Protocol](https://modelcontextprotocol.io/)** - Model Context Protocol specification
 
 ---
@@ -358,11 +449,27 @@ public class MyNewTool
 - Timeout protection against hanging requests
 - Configure timeout limits via `API_MAX_TIMEOUT`
 
+### Azure DevOps Tool
+- PAT stored only in environment variables, never logged
+- Read-only access to Azure DevOps (no write operations)
+- SSL validation always enabled for API connections
+- File content never logged to protect sensitive data
+- Configurable file size and count limits
+
 ---
 
 ## 🛣️ Roadmap
 
+### Recently Added
+- [x] Azure DevOps PR Review Tool with DiffPlex integration
+- [x] Security, Quality, and Best Practices analyzers
+- [x] Multiple diff formats (unified, side-by-side, inline)
+
 ### Planned Features
+- [ ] AI-powered intelligent PR review comments
+- [ ] Post review comments back to Azure DevOps
+- [ ] GitHub PR review support
+- [ ] GitLab MR review support
 - [ ] Additional database support (PostgreSQL, MySQL, SQLite)
 - [ ] GraphQL API testing
 - [ ] WebSocket testing
@@ -370,8 +477,6 @@ public class MyNewTool
 - [ ] Cloud provider integration tools (AWS, Azure, GCP)
 - [ ] Docker container management
 - [ ] Git operations tool
-- [ ] Comprehensive test suite
-- [ ] Performance benchmarks
 - [ ] Docker containerization
 
 ### Community Feedback
@@ -405,6 +510,7 @@ Contributions are welcome! Please follow these guidelines:
 - **MCP Client**: Any MCP-compatible AI assistant
 
 ### NuGet Dependencies
+- `DiffPlex` (^1.9.0) - Diff generation and analysis
 - `Microsoft.Data.SqlClient` (^6.1.2) - SQL Server connectivity
 - `Microsoft.Extensions.Hosting` (^8.0.1) - Hosting and DI infrastructure
 - `ModelContextProtocol` (^0.4.0-preview.3) - MCP server framework
@@ -444,6 +550,24 @@ Solution:
 1. Increase API_DEFAULT_TIMEOUT environment variable
 2. Check network connectivity
 3. Verify target API is responsive
+```
+
+### Azure DevOps Authentication Issues
+```
+Issue: "Authentication failed" or "PAT not found"
+Solution: 
+1. Set AZURE_DEVOPS_PAT environment variable
+2. Verify PAT has not expired
+3. Ensure PAT has Code (Read) and Pull Request Threads (Read) permissions
+4. Restart your MCP client after setting environment variable
+```
+
+### Azure DevOps PR URL Issues
+```
+Issue: "Invalid Azure DevOps PR URL format"
+Solution: 
+URL must be in format:
+https://dev.azure.com/{organization}/{project}/_git/{repository}/pullrequest/{id}
 ```
 
 ---
