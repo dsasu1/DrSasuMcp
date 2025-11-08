@@ -72,12 +72,12 @@ namespace DrSasuMcp.Tools.API
         #region HTTP Request Methods
 
         [McpServerTool(
-            Title = "Send GET Request",
+            Title = "HTTP: Send GET Request",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
             Description("Executes an HTTP GET request to the specified URL")]
-        public async Task<OperationResult> SendGetRequest(
+        public async Task<OperationResult> HTTPSendGetRequest(
             [Description("The URL to send the request to")] string url,
             [Description("Optional headers as JSON object")] string? headers = null,
             [Description("Optional query parameters as JSON object")] string? queryParams = null,
@@ -100,12 +100,12 @@ namespace DrSasuMcp.Tools.API
         }
 
         [McpServerTool(
-            Title = "Send POST Request",
+            Title = "HTTP: Send POST Request",
             ReadOnly = false,
             Idempotent = false,
             Destructive = false),
             Description("Executes an HTTP POST request with an optional body")]
-        public async Task<OperationResult> SendPostRequest(
+        public async Task<OperationResult> HTTPSendPostRequest(
             [Description("The URL to send the request to")] string url,
             [Description("Request body content")] string? body = null,
             [Description("Content type (e.g., application/json)")] string contentType = ContentTypeJson,
@@ -130,12 +130,12 @@ namespace DrSasuMcp.Tools.API
         }
 
         [McpServerTool(
-            Title = "Send PUT Request",
+            Title = "HTTP: Send PUT Request",
             ReadOnly = false,
             Idempotent = true,
             Destructive = false),
             Description("Executes an HTTP PUT request with an optional body")]
-        public async Task<OperationResult> SendPutRequest(
+        public async Task<OperationResult> HTTPSendPutRequest(
             [Description("The URL to send the request to")] string url,
             [Description("Request body content")] string? body = null,
             [Description("Content type (e.g., application/json)")] string contentType = ContentTypeJson,
@@ -160,12 +160,12 @@ namespace DrSasuMcp.Tools.API
         }
 
         [McpServerTool(
-            Title = "Send PATCH Request",
+            Title = "HTTP: Send PATCH Request",
             ReadOnly = false,
             Idempotent = false,
             Destructive = false),
             Description("Executes an HTTP PATCH request with an optional body")]
-        public async Task<OperationResult> SendPatchRequest(
+        public async Task<OperationResult> HTTPSendPatchRequest(
             [Description("The URL to send the request to")] string url,
             [Description("Request body content")] string? body = null,
             [Description("Content type (e.g., application/json)")] string contentType = ContentTypeJson,
@@ -190,12 +190,12 @@ namespace DrSasuMcp.Tools.API
         }
 
         [McpServerTool(
-            Title = "Send DELETE Request",
+            Title = "HTTP: Send DELETE Request",
             ReadOnly = false,
             Idempotent = true,
             Destructive = true),
             Description("Executes an HTTP DELETE request")]
-        public async Task<OperationResult> SendDeleteRequest(
+        public async Task<OperationResult> HTTPSendDeleteRequest(
             [Description("The URL to send the request to")] string url,
             [Description("Optional headers as JSON object")] string? headers = null,
             [Description("Optional query parameters as JSON object")] string? queryParams = null,
@@ -218,12 +218,12 @@ namespace DrSasuMcp.Tools.API
         }
 
         [McpServerTool(
-            Title = "Send HEAD Request",
+            Title = "HTTP: Send HEAD Request",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
             Description("Executes an HTTP HEAD request to check endpoint availability without downloading the body")]
-        public async Task<OperationResult> SendHeadRequest(
+        public async Task<OperationResult> HTTPSendHeadRequest(
             [Description("The URL to send the request to")] string url,
             [Description("Optional headers as JSON object")] string? headers = null,
             [Description("Optional authentication config as JSON")] string? auth = null,
@@ -244,7 +244,7 @@ namespace DrSasuMcp.Tools.API
         }
 
         [McpServerTool(
-            Title = "Send OPTIONS Request",
+            Title = "HTTP: Send OPTIONS Request",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
@@ -274,12 +274,12 @@ namespace DrSasuMcp.Tools.API
         #region Testing Methods
 
         [McpServerTool(
-            Title = "Execute API Test",
+            Title = "HTTP: Execute API Test",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
             Description("Executes an API test with validation rules and returns detailed test results")]
-        public async Task<OperationResult> ExecuteTest(
+        public async Task<OperationResult> HTTPExecuteTest(
             [Description("HTTP method (GET, POST, PUT, PATCH, DELETE)")] string method,
             [Description("The URL to test")] string url,
             [Description("Optional request body")] string? body = null,
@@ -374,12 +374,12 @@ namespace DrSasuMcp.Tools.API
         }
 
         [McpServerTool(
-            Title = "Execute Test Suite",
+            Title = "HTTP: Execute Test Suite",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
             Description("Executes multiple API tests in sequence and returns aggregated results")]
-        public async Task<OperationResult> ExecuteTestSuite(
+        public async Task<OperationResult> HTTPExecuteTestSuite(
             [Description("Base URL for all tests")] string? baseUrl = null,
             [Description("Test suite configuration as JSON")] string tests = "[]",
             [Description("Stop execution on first failure")] bool stopOnFailure = false)
@@ -529,12 +529,12 @@ namespace DrSasuMcp.Tools.API
         #region Utility Methods
 
         [McpServerTool(
-            Title = "Parse JSON Path",
+            Title = "JSON: Parse JSON Path",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
             Description("Extracts a value from JSON using a JSONPath expression")]
-        public OperationResult ParseJsonPath(
+        public OperationResult JSONParseJsonPath(
             [Description("JSON content to parse")] string json,
             [Description("JSONPath expression (e.g., $.users[0].name)")] string path)
         {
@@ -561,12 +561,12 @@ namespace DrSasuMcp.Tools.API
         }
 
         [McpServerTool(
-            Title = "Inspect Endpoint",
+            Title = "HTTP: Inspect Endpoint",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
             Description("Performs a detailed inspection of an endpoint including response headers, timing, and metadata")]
-        public async Task<OperationResult> InspectEndpoint(
+        public async Task<OperationResult> HTTPInspectEndpoint(
             [Description("The URL to inspect")] string url,
             [Description("Optional authentication config as JSON")] string? auth = null)
         {

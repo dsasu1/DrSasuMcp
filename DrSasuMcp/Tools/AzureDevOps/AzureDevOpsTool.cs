@@ -40,12 +40,12 @@ namespace DrSasuMcp.Tools.AzureDevOps
         /// <param name="minIssueLevel">Minimum issue level to report: info, warning, critical (default: info)</param>
         /// <returns>Comprehensive review summary with all findings</returns>
         [McpServerTool(
-            Title = "Review Azure DevOps Pull Request",
+            Title = "Azure: Review Azure DevOps Pull Request",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
             Description("Review an Azure DevOps Pull Request and provide comprehensive code analysis with security, quality, and best practice insights")]
-        public async Task<OperationResult> ReviewPullRequest(
+        public async Task<OperationResult> AzureReviewPullRequest(
             [Description("Full Azure DevOps PR URL")] string prUrl,
             [Description("Comma-separated analyzers: security,quality,bestpractices (default: all)")] 
             string? includeAnalyzers = null,
@@ -208,12 +208,12 @@ namespace DrSasuMcp.Tools.AzureDevOps
         /// <param name="diffFormat">Diff format: unified, sidebyside, inline (default: unified)</param>
         /// <returns>Diff results for the requested file(s)</returns>
         [McpServerTool(
-            Title = "Get Pull Request Diff",
+            Title = "Azure: Get Pull Request Diff",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
             Description("Get detailed diff for a Pull Request or specific file, showing line-by-line changes in unified, side-by-side, or inline format")]
-        public async Task<OperationResult> GetPullRequestDiff(
+        public async Task<OperationResult> AzureGetPullRequestDiff(
             [Description("Full Azure DevOps PR URL")] string prUrl,
             [Description("Optional: specific file path to get diff for")] string? filePath = null,
             [Description("Diff format: unified, sidebyside, inline (default: unified)")] 
@@ -303,12 +303,12 @@ namespace DrSasuMcp.Tools.AzureDevOps
         /// <param name="prUrl">Full Azure DevOps PR URL</param>
         /// <returns>Pull request metadata</returns>
         [McpServerTool(
-            Title = "Get Pull Request Info",
+            Title = "Azure: Get Pull Request Info",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
             Description("Get Pull Request metadata including title, author, status, and file count without performing analysis")]
-        public async Task<OperationResult> GetPullRequestInfo(
+        public async Task<OperationResult> AzureGetPullRequestInfo(
             [Description("Full Azure DevOps PR URL")] string prUrl)
         {
             try
@@ -351,12 +351,12 @@ namespace DrSasuMcp.Tools.AzureDevOps
         /// </summary>
         /// <returns>Connection test result</returns>
         [McpServerTool(
-            Title = "Test Azure DevOps Connection",
+            Title = "Azure: Test Azure DevOps Connection",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
             Description("Test the connection to Azure DevOps using the configured Personal Access Token and verify authentication")]
-        public async Task<OperationResult> TestConnection()
+        public async Task<OperationResult> AzureTestConnection()
         {
             try
             {

@@ -21,12 +21,12 @@ namespace DrSasuMcp.Tools.SQL
         #region Public Methods
 
         [McpServerTool(
-       Title = "Describe Table",
+       Title = "SQL: Describe Table",
        ReadOnly = true,
        Idempotent = true,
        Destructive = false),
        Description("Returns table schema")]
-        public async Task<OperationResult> DescribeTable(
+        public async Task<OperationResult> SQLDescribeTable(
        [Description("Name of table")] string name)
         {
             string? schema = null;
@@ -164,12 +164,12 @@ namespace DrSasuMcp.Tools.SQL
         }
 
         [McpServerTool(
-        Title = "Read Data",
+        Title = "SQL: Read Data",
         ReadOnly = true,
         Idempotent = true,
         Destructive = false),
         Description("Executes SQL queries against SQL Database to read data")]
-        public async Task<OperationResult> ReadData(
+        public async Task<OperationResult> SQLReadData(
         [Description("SQL query to execute")] string sql)
         {
             var conn = await _connectionFactory.GetOpenConnectionAsync();
@@ -200,12 +200,12 @@ namespace DrSasuMcp.Tools.SQL
         }
 
         [McpServerTool(
-        Title = "List Tables",
+        Title = "SQL: List Tables",
         ReadOnly = true,
         Idempotent = true,
         Destructive = false),
         Description("Lists all tables in the SQL Database.")]
-        public async Task<OperationResult> ListTables()
+        public async Task<OperationResult> SQLListTables()
         {
             var conn = await _connectionFactory.GetOpenConnectionAsync();
             try
@@ -230,11 +230,11 @@ namespace DrSasuMcp.Tools.SQL
         }
 
         [McpServerTool(
-     Title = "Insert Data",
+     Title = "SQL: Insert Data",
      ReadOnly = false,
      Destructive = false),
      Description("Updates data in a table in the SQL Database. Expects a valid INSERT SQL statement as input. ")]
-        public async Task<OperationResult> InsertData(
+        public async Task<OperationResult> SQLInsertData(
      [Description("INSERT SQL statement")] string sql)
         {
             var conn = await _connectionFactory.GetOpenConnectionAsync();
@@ -259,7 +259,7 @@ namespace DrSasuMcp.Tools.SQL
        ReadOnly = false,
        Destructive = true),
        Description("Drops a table in the SQL Database. Expects a valid DROP TABLE SQL statement as input.")]
-        public async Task<OperationResult> DropTable(
+        public async Task<OperationResult> SQLDropTable(
        [Description("DROP TABLE SQL statement")] string sql)
         {
             var conn = await _connectionFactory.GetOpenConnectionAsync();
@@ -280,11 +280,11 @@ namespace DrSasuMcp.Tools.SQL
         }
 
         [McpServerTool(
-        Title = "Create Table",
+        Title = "SQL: Create Table",
         ReadOnly = false,
         Destructive = false),
         Description("Creates a new table in the SQL Database. Expects a valid CREATE TABLE SQL statement as input.")]
-        public async Task<OperationResult> CreateTable(
+        public async Task<OperationResult> SQLCreateTable(
         [Description("CREATE TABLE SQL statement")] string sql)
         {
             var conn = await _connectionFactory.GetOpenConnectionAsync();
@@ -305,11 +305,11 @@ namespace DrSasuMcp.Tools.SQL
         }
 
         [McpServerTool(
-        Title = "Update Data",
+        Title = "SQL: Update Data",
         ReadOnly = false,
         Destructive = true),
         Description("Updates data in a table in the SQL Database. Expects a valid UPDATE SQL statement as input.")]
-        public async Task<OperationResult> UpdateData(
+        public async Task<OperationResult> SQLUpdateData(
         [Description("UPDATE SQL statement")] string sql)
         {
             var conn = await _connectionFactory.GetOpenConnectionAsync();
