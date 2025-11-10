@@ -147,7 +147,7 @@ namespace DrSasuMcp.Tests.API
             var path = "$.name";
 
             // Act
-            var result = _apiTool.ParseJsonPath(json, path);
+            var result = _apiTool.JSONParseJsonPath(json, path);
 
             // Assert
             result.Should().NotBeNull();
@@ -163,7 +163,7 @@ namespace DrSasuMcp.Tests.API
             var path = "$.name";
 
             // Act
-            var result = _apiTool.ParseJsonPath(json, path);
+            var result = _apiTool.JSONParseJsonPath(json, path);
 
             // Assert
             // ParseJsonPath returns Success=true even for invalid JSON
@@ -181,7 +181,7 @@ namespace DrSasuMcp.Tests.API
             var path = "$.user.profile.email";
 
             // Act
-            var result = _apiTool.ParseJsonPath(json, path);
+            var result = _apiTool.JSONParseJsonPath(json, path);
 
             // Assert
             result.Should().NotBeNull();

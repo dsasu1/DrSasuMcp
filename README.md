@@ -8,7 +8,7 @@
 
 ## 🌟 Overview
 
-DrSasuMcp brings **SQL Server database management**, **HTTP API testing**, and **Azure DevOps PR review** directly into your AI assistant conversations. Execute queries, manage schemas, test APIs, review pull requests, and validate code—all through natural language commands.
+DrSasuMcp brings **SQL Server database management**, **HTTP API testing**, **Azure DevOps PR review**, and **Datadog monitoring & troubleshooting** directly into your AI assistant conversations. Execute queries, manage schemas, test APIs, review pull requests, troubleshoot issues, and monitor systems—all through natural language commands.
 
 ### Why DrSasuMcp?
 
@@ -112,6 +112,60 @@ Automated code review for Azure DevOps Pull Requests with security, quality, and
 
 [📖 Azure DevOps Tool Documentation](DrSasuMcp/Tools/AzureDevOps/README.md) | [🚀 Quick Start Guide](DrSasuMcp/Tools/AzureDevOps/QUICKSTART.md)
 
+### 📊 Datadog Monitoring & Troubleshooting Tool
+
+Comprehensive Datadog integration for monitoring, troubleshooting, and issue resolution:
+
+- **Connection & Authentication**
+  - Test Datadog API connectivity
+  - Get account/organization information
+  
+- **Metrics Analysis**
+  - Query metrics with time ranges and filters
+  - List available metrics and get metadata
+  - Analyze metric anomalies and trends
+  
+- **Logs Analysis**
+  - Query and search logs with advanced filters
+  - Analyze log patterns and statistics
+  - Get log context for troubleshooting
+  
+- **Traces & APM**
+  - Query distributed traces
+  - Analyze trace performance and latency
+  - Identify bottlenecks in service calls
+  
+- **Error Tracking**
+  - Get error issues grouped by similarity
+  - Track error trends and patterns
+  - Analyze error context and correlations
+  
+- **Service Map**
+  - Visualize service dependencies
+  - Analyze service health and impact
+  - Identify cascading failure risks
+  
+- **Monitors & Alerts**
+  - List and query monitors
+  - Get active alerts and monitor status
+  - Analyze alert patterns
+  
+- **Dashboards**
+  - List available dashboards
+  - Get dashboard configurations and widgets
+  
+- **Events**
+  - Query and create custom events
+  - Track system events and changes
+  
+- **Advanced Troubleshooting**
+  - Comprehensive issue analysis with multiple troubleshooters
+  - Root cause analysis with data correlation
+  - Prioritized fix recommendations with impact/effort estimates
+  - Intelligent troubleshooter selection based on issue description
+
+[📖 Datadog Tool Documentation](DrSasuMcp/Tools/Datadog/README.md) | [📋 Implementation Plan](DrSasuMcp/Tools/Datadog/IMPLEMENTATION_PLAN.md)
+
 ---
 
 ## 🚀 Quick Start
@@ -121,6 +175,7 @@ Automated code review for Azure DevOps Pull Requests with security, quality, and
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
 - SQL Server (for SQL tool features)
 - Azure DevOps account with Personal Access Token (for Azure DevOps tool features)
+- Datadog account with API Key (for Datadog tool features)
 - MCP-compatible AI assistant (Claude Desktop, VS Code with MCP, etc.)
 
 ### Installation
@@ -167,7 +222,10 @@ Add to your Claude Desktop configuration file:
         "API_FOLLOW_REDIRECTS": "true",
         "API_VALIDATE_SSL": "true",
         "API_MAX_REDIRECTS": "10",
-        "AZURE_DEVOPS_PAT": "your_azure_devops_personal_access_token"
+        "AZURE_DEVOPS_PAT": "your_azure_devops_personal_access_token",
+        "DD_API_KEY": "your_datadog_api_key",
+        "DD_APP_KEY": "your_datadog_application_key",
+        "DD_SITE": "datadoghq.com"
       }
     }
   }
@@ -196,7 +254,10 @@ Then configure Claude Desktop:
         "API_FOLLOW_REDIRECTS": "true",
         "API_VALIDATE_SSL": "true",
         "API_MAX_REDIRECTS": "10",
-        "AZURE_DEVOPS_PAT": "your_azure_devops_personal_access_token"
+        "AZURE_DEVOPS_PAT": "your_azure_devops_personal_access_token",
+        "DD_API_KEY": "your_datadog_api_key",
+        "DD_APP_KEY": "your_datadog_application_key",
+        "DD_SITE": "datadoghq.com"
       }
     }
   }
@@ -216,7 +277,10 @@ Then configure Claude Desktop:
         "API_FOLLOW_REDIRECTS": "true",
         "API_VALIDATE_SSL": "true",
         "API_MAX_REDIRECTS": "10",
-        "AZURE_DEVOPS_PAT": "your_azure_devops_personal_access_token"
+        "AZURE_DEVOPS_PAT": "your_azure_devops_personal_access_token",
+        "DD_API_KEY": "your_datadog_api_key",
+        "DD_APP_KEY": "your_datadog_application_key",
+        "DD_SITE": "datadoghq.com"
       }
     }
   }
@@ -278,6 +342,31 @@ export AZURE_DEVOPS_TIMEOUT="60"
 
 > **Note:** The Azure DevOps PAT is required to use PR review features. Other environment variables are optional with sensible defaults.
 
+**Datadog Tool Configuration (Required for Datadog features):**
+```bash
+# Windows PowerShell
+$env:DD_API_KEY = "your_datadog_api_key"
+$env:DD_APP_KEY = "your_datadog_application_key"  # Optional, for admin operations
+$env:DD_SITE = "datadoghq.com"                    # Optional (default: datadoghq.com)
+$env:DD_TIMEOUT_SECONDS = "60"                    # Optional (default: 60)
+$env:DD_MAX_RESULTS = "1000"                      # Optional (default: 1000)
+
+# Linux/Mac
+export DD_API_KEY="your_datadog_api_key"
+export DD_APP_KEY="your_datadog_application_key"
+export DD_SITE="datadoghq.com"
+export DD_TIMEOUT_SECONDS="60"
+export DD_MAX_RESULTS="1000"
+```
+
+**Setting up Datadog API Keys:**
+1. Go to Datadog → Organization Settings → API Keys
+2. Click "New Key" to create an API key
+3. For admin operations (monitors, dashboards), also create an Application Key
+4. Copy the keys and set them as environment variables
+
+> **Note:** The Datadog API key is required for all operations. The Application key is optional but required for some admin operations. Site can be `datadoghq.com` (US), `datadoghq.eu` (EU), `us3.datadoghq.com`, `us5.datadoghq.com`, or `ap1.datadoghq.com`.
+
 ---
 
 ## 💡 Usage Examples
@@ -330,6 +419,28 @@ You: "What changed in this PR and are there any critical issues?"
 AI: Provides PR summary with file changes and prioritized issue list
 ```
 
+### Datadog Monitoring & Troubleshooting
+
+```
+You: "Troubleshoot high error rate in payment-service"
+AI: Analyzes metrics, logs, traces, and errors to provide recommendations
+
+You: "What's the root cause of the performance degradation?"
+AI: Performs root cause analysis by correlating data across all sources
+
+You: "Get active alerts from Datadog"
+AI: Lists all currently active alerts with monitor details
+
+You: "Query CPU metrics for the last hour"
+AI: Queries and returns CPU usage metrics with time series data
+
+You: "Show me the service map for payment-service"
+AI: Displays service dependencies and health status
+
+You: "Recommend fixes for the database timeout errors"
+AI: Generates prioritized fix recommendations with impact/effort estimates
+```
+
 ---
 
 ## 🏗️ Architecture
@@ -364,6 +475,17 @@ DrSasuMcp/
         ├── Utils/               # PR URL parser
         ├── README.md            # Azure DevOps tool documentation
         └── QUICKSTART.md        # Quick start guide
+    └── Datadog/
+        ├── DatadogTool.cs       # MCP-exposed Datadog operations
+        ├── DatadogService.cs    # Datadog REST API client
+        ├── IDatadogService.cs   # Service interface
+        ├── DatadogToolConstants.cs # Configuration constants
+        ├── Models/              # Metric, Log, Trace, Error, ServiceMap models
+        ├── Troubleshooters/     # Metrics, Logs, Traces, Errors, ServiceMap troubleshooters
+        ├── Utils/               # QueryBuilder, TimeRangeParser
+        ├── README.md            # Datadog tool documentation
+        ├── IMPLEMENTATION_PLAN.md # Implementation details
+        └── TOOLS_LIST.md        # Complete tools list
 ```
 
 ### Design Principles
@@ -429,6 +551,7 @@ public class MyNewTool
 - **[API Tool Documentation](DrSasuMcp/Tools/API/README.md)** - Complete guide to API testing
 - **[Azure DevOps Tool Documentation](DrSasuMcp/Tools/AzureDevOps/README.md)** - Complete guide to PR reviews
 - **[Azure DevOps Quick Start](DrSasuMcp/Tools/AzureDevOps/QUICKSTART.md)** - 5-minute setup guide
+- **[Datadog Tool Documentation](DrSasuMcp/Tools/Datadog/README.md)** - Complete guide to Datadog monitoring and troubleshooting
 - **[MCP Protocol](https://modelcontextprotocol.io/)** - Model Context Protocol specification
 
 ---
@@ -456,6 +579,14 @@ public class MyNewTool
 - File content never logged to protect sensitive data
 - Configurable file size and count limits
 
+### Datadog Tool
+- API keys stored only in environment variables, never logged
+- Read-only operations by default (except event creation)
+- SSL validation always enabled for API connections
+- Comprehensive error handling and retry logic
+- Configurable timeouts and result limits
+- Intelligent troubleshooter selection based on issue description
+
 ---
 
 ## 🛣️ Roadmap
@@ -464,6 +595,9 @@ public class MyNewTool
 - [x] Azure DevOps PR Review Tool with DiffPlex integration
 - [x] Security, Quality, and Best Practices analyzers
 - [x] Multiple diff formats (unified, side-by-side, inline)
+- [x] Datadog Monitoring & Troubleshooting Tool
+- [x] Advanced troubleshooting with root cause analysis
+- [x] Intelligent fix recommendations with impact/effort estimates
 
 ### Planned Features
 - [ ] AI-powered intelligent PR review comments
@@ -568,6 +702,27 @@ Issue: "Invalid Azure DevOps PR URL format"
 Solution: 
 URL must be in format:
 https://dev.azure.com/{organization}/{project}/_git/{repository}/pullrequest/{id}
+```
+
+### Datadog Authentication Issues
+```
+Issue: "Authentication failed" or "API key not configured"
+Solution: 
+1. Set DD_API_KEY environment variable
+2. Verify API key is valid and not expired
+3. For admin operations, also set DD_APP_KEY
+4. Check DD_SITE matches your Datadog region
+5. Restart your MCP client after setting environment variables
+```
+
+### Datadog Query Issues
+```
+Issue: "Time range exceeds maximum" or "Invalid time format"
+Solution: 
+1. Time range is limited to 168 hours (7 days) maximum
+2. Use relative time formats: "1h", "30m", "24h", "1h ago", "now"
+3. Or use ISO 8601 format: "2024-01-01T00:00:00Z"
+4. Ensure start time is before end time
 ```
 
 ---

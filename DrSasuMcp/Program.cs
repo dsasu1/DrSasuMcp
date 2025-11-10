@@ -4,6 +4,7 @@ using DrSasuMcp.Tools.API.Authentication;
 using DrSasuMcp.Tools.API.Validators;
 using DrSasuMcp.Tools.AzureDevOps;
 using DrSasuMcp.Tools.AzureDevOps.Analyzers;
+using DrSasuMcp.Tools.Datadog;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -60,6 +61,19 @@ namespace DrSasuMcp
             
             // Azure DevOps Tool
             _ = builder.Services.AddSingleton<AzureDevOpsTool>();
+
+            // Register Datadog Tool dependencies
+            _ = builder.Services.AddSingleton<IDatadogService, DatadogService>();
+
+            // Datadog Troubleshooters
+            _ = builder.Services.AddSingleton<DrSasuMcp.Tools.Datadog.Troubleshooters.ITroubleshooter, DrSasuMcp.Tools.Datadog.Troubleshooters.MetricsTroubleshooter>();
+            _ = builder.Services.AddSingleton<DrSasuMcp.Tools.Datadog.Troubleshooters.ITroubleshooter, DrSasuMcp.Tools.Datadog.Troubleshooters.LogsTroubleshooter>();
+            _ = builder.Services.AddSingleton<DrSasuMcp.Tools.Datadog.Troubleshooters.ITroubleshooter, DrSasuMcp.Tools.Datadog.Troubleshooters.TracesTroubleshooter>();
+            _ = builder.Services.AddSingleton<DrSasuMcp.Tools.Datadog.Troubleshooters.ITroubleshooter, DrSasuMcp.Tools.Datadog.Troubleshooters.ErrorTrackingTroubleshooter>();
+            _ = builder.Services.AddSingleton<DrSasuMcp.Tools.Datadog.Troubleshooters.ITroubleshooter, DrSasuMcp.Tools.Datadog.Troubleshooters.ServiceMapTroubleshooter>();
+
+            // Datadog Tool
+            _ = builder.Services.AddSingleton<DatadogTool>();
 
             builder.Services
                 .AddMcpServer()
