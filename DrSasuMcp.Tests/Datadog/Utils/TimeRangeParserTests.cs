@@ -58,8 +58,8 @@ namespace DrSasuMcp.Tests.Datadog.Utils
         [Theory]
         [InlineData("1h", 1)]
         [InlineData("30m", 0.5)]
-        [InlineData("2d", 2)]
-        [InlineData("1w", 7)]
+        [InlineData("2d", 48)]
+        [InlineData("1w", 168)]
         public void ParseTimeRange_WithDuration_ReturnsCorrectRange(string duration, double expectedHours)
         {
             // Act

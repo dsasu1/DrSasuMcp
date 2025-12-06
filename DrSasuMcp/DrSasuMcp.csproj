@@ -15,6 +15,7 @@
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
     <PackageReference Include="ModelContextProtocol" Version="0.4.0-preview.3" />
+    <PackageReference Include="MongoDB.Driver" Version="2.28.0" />
   </ItemGroup>
 
 </Project>

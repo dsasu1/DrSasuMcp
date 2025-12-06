@@ -1,4 +1,5 @@
 ﻿using DrSasuMcp.Tools.SQL;
+using DrSasuMcp.Tools.MongoDB;
 using DrSasuMcp.Tools.API;
 using DrSasuMcp.Tools.API.Authentication;
 using DrSasuMcp.Tools.API.Validators;
@@ -27,6 +28,10 @@ namespace DrSasuMcp
             // Register SQL Tool dependencies
             _ = builder.Services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
             _ = builder.Services.AddSingleton<SQLTool>();
+
+            // Register MongoDB Tool dependencies
+            _ = builder.Services.AddSingleton<IMongoConnectionFactory, MongoConnectionFactory>();
+            _ = builder.Services.AddSingleton<MongoDBTool>();
 
             // Register API Tool dependencies
             // HTTP Client Factory

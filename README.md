@@ -8,7 +8,7 @@
 
 ## 🌟 Overview
 
-DrSasuMcp brings **SQL Server database management**, **HTTP API testing**, **Azure DevOps PR review**, and **Datadog monitoring & troubleshooting** directly into your AI assistant conversations. Execute queries, manage schemas, test APIs, review pull requests, troubleshoot issues, and monitor systems—all through natural language commands.
+DrSasuMcp brings **SQL Server and MongoDB database management**, **HTTP API testing**, **Azure DevOps PR review**, and **Datadog monitoring & troubleshooting** directly into your AI assistant conversations. Execute queries, manage schemas, test APIs, review pull requests, troubleshoot issues, and monitor systems—all through natural language commands.
 
 ### Why DrSasuMcp?
 
@@ -44,6 +44,33 @@ Complete SQL Server database management and querying capabilities:
   - Comprehensive error messages
 
 [📖 SQL Tool Documentation](DrSasuMcp/Tools/SQL/README.md)
+
+### 🍃 MongoDB Database Tool
+
+Complete MongoDB database management and querying capabilities:
+
+- **Schema Exploration**
+  - List all collections in the database
+  - Describe collection structures with indexes, document counts, and sample documents
+  - Automatic schema inference from sample documents
+  - Collection metadata (size, storage, average document size)
+  
+- **Data Operations**
+  - Execute find queries with filters, projections, sort, limit, and skip
+  - Insert single or multiple documents
+  - Update documents with MongoDB update operators
+  - Delete documents with filters
+  - Create and drop collections
+  - Support for capped collections and validation rules
+
+- **Safety Features**
+  - Read-only operations marked appropriately
+  - Destructive operations flagged for safety
+  - Multi-document operations default to single-document for safety
+  - Connection pooling and async operations
+  - Comprehensive error messages
+
+[📖 MongoDB Tool Documentation](DrSasuMcp/Tools/MongoDB/README.md)
 
 ### 🌐 API Testing Tool
 
@@ -174,6 +201,7 @@ Comprehensive Datadog integration for monitoring, troubleshooting, and issue res
 
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
 - SQL Server (for SQL tool features)
+- MongoDB (for MongoDB tool features)
 - Azure DevOps account with Personal Access Token (for Azure DevOps tool features)
 - Datadog account with API Key (for Datadog tool features)
 - MCP-compatible AI assistant (Claude Desktop, VS Code with MCP, etc.)
@@ -217,6 +245,7 @@ Add to your Claude Desktop configuration file:
       "args": ["run", "--project", "C:\\Projects\\personal\\DrSasuMcp\\DrSasuMcp\\DrSasuMcp.csproj"],
       "env": {
         "SQL_CONNECTION_STRING": "Server=.;Database=YourDatabase;Trusted_Connection=True;TrustServerCertificate=True",
+        "MONGODB_CONNECTION_STRING": "mongodb://localhost:27017/test",
         "API_DEFAULT_TIMEOUT": "30",
         "API_MAX_TIMEOUT": "300",
         "API_FOLLOW_REDIRECTS": "true",
@@ -249,6 +278,7 @@ Then configure Claude Desktop:
       "command": "C:\\Projects\\personal\\DrSasuMcp\\publish\\DrSasuMcp.exe",
       "env": {
         "SQL_CONNECTION_STRING": "Server=.;Database=YourDatabase;Trusted_Connection=True;TrustServerCertificate=True",
+        "MONGODB_CONNECTION_STRING": "mongodb://localhost:27017/test",
         "API_DEFAULT_TIMEOUT": "30",
         "API_MAX_TIMEOUT": "300",
         "API_FOLLOW_REDIRECTS": "true",
@@ -272,6 +302,7 @@ Then configure Claude Desktop:
       "command": "/path/to/DrSasuMcp/publish/DrSasuMcp",
       "env": {
         "SQL_CONNECTION_STRING": "Server=localhost;Database=YourDatabase;User Id=sa;Password=YourPassword;TrustServerCertificate=True",
+        "MONGODB_CONNECTION_STRING": "mongodb://localhost:27017/test",
         "API_DEFAULT_TIMEOUT": "30",
         "API_MAX_TIMEOUT": "300",
         "API_FOLLOW_REDIRECTS": "true",
@@ -299,6 +330,25 @@ $env:SQL_CONNECTION_STRING = "Server=.;Database=test;Trusted_Connection=True;Tru
 # Linux/Mac
 export SQL_CONNECTION_STRING="Server=localhost;Database=test;User Id=sa;Password=YourPassword;TrustServerCertificate=True"
 ```
+
+**MongoDB Tool Configuration (Required for MongoDB features):**
+```bash
+# Windows PowerShell
+$env:MONGODB_CONNECTION_STRING = "mongodb://localhost:27017/test"
+
+# With authentication
+$env:MONGODB_CONNECTION_STRING = "mongodb://username:password@localhost:27017/test"
+
+# MongoDB Atlas (cloud)
+$env:MONGODB_CONNECTION_STRING = "mongodb+srv://username:password@cluster.mongodb.net/test"
+
+# Linux/Mac
+export MONGODB_CONNECTION_STRING="mongodb://localhost:27017/test"
+export MONGODB_CONNECTION_STRING="mongodb://username:password@localhost:27017/test"
+export MONGODB_CONNECTION_STRING="mongodb+srv://username:password@cluster.mongodb.net/test"
+```
+
+> **Note:** The MongoDB connection string should include the database name. If not specified, it defaults to "test". For MongoDB Atlas, use the `mongodb+srv://` protocol.
 
 **API Tool Configuration (Optional):**
 ```bash
@@ -387,6 +437,28 @@ You: "Create a Products table with Id, Name, and Price columns"
 AI: Executes CREATE TABLE with appropriate schema
 ```
 
+### MongoDB Database Operations
+
+```
+You: "Show me all collections in my MongoDB database"
+AI: Lists all collection names
+
+You: "Describe the users collection"
+AI: Shows collection structure with indexes, document count, and sample documents
+
+You: "Get all users with age over 25"
+AI: Executes: MongoReadData(collection: "users", filter: "{\"age\": {\"$gt\": 25}}")
+
+You: "Add a new user named 'Bob' with email 'bob@example.com'"
+AI: Inserts document: MongoInsertData(collection: "users", documents: "[{\"name\": \"Bob\", \"email\": \"bob@example.com\"}]")
+
+You: "Update user John's age to 31"
+AI: Updates document: MongoUpdateData(collection: "users", filter: "{\"name\": \"John\"}", update: "{\"$set\": {\"age\": 31}}")
+
+You: "Create a collection called 'feedback'"
+AI: Creates new collection: MongoCreateCollection(name: "feedback")
+```
+
 ### API Testing
 
 ```
@@ -457,6 +529,11 @@ DrSasuMcp/
     │   ├── ISqlConnectionFactory.cs
     │   ├── SqlConnectionFactory.cs
     │   └── README.md            # SQL tool documentation
+    ├── MongoDB/
+    │   ├── MongoDBTool.cs       # MCP-exposed MongoDB operations
+    │   ├── IMongoConnectionFactory.cs
+    │   ├── MongoConnectionFactory.cs
+    │   └── README.md            # MongoDB tool documentation
     ├── API/
     │   ├── APITool.cs           # MCP-exposed API operations
     │   ├── APIToolConstants.cs  # API configuration constants
@@ -548,6 +625,7 @@ public class MyNewTool
 ## 📚 Documentation
 
 - **[SQL Tool Documentation](DrSasuMcp/Tools/SQL/README.md)** - Complete guide to database operations
+- **[MongoDB Tool Documentation](DrSasuMcp/Tools/MongoDB/README.md)** - Complete guide to MongoDB operations
 - **[API Tool Documentation](DrSasuMcp/Tools/API/README.md)** - Complete guide to API testing
 - **[Azure DevOps Tool Documentation](DrSasuMcp/Tools/AzureDevOps/README.md)** - Complete guide to PR reviews
 - **[Azure DevOps Quick Start](DrSasuMcp/Tools/AzureDevOps/QUICKSTART.md)** - 5-minute setup guide
@@ -564,6 +642,14 @@ public class MyNewTool
 - Never commit connection strings with credentials
 - Use encrypted connections for remote databases
 - Enable auditing for destructive operations
+
+### MongoDB Tool
+- ⚠️ Accepts JSON filter/update documents—validate JSON syntax
+- Grant minimal necessary database permissions
+- Never commit connection strings with credentials
+- Use TLS/SSL for remote MongoDB connections
+- Multi-document operations default to single-document for safety
+- Enable MongoDB audit logging for destructive operations
 
 ### API Tool
 - Validate SSL certificates by default (can be disabled via environment variable)
@@ -592,6 +678,9 @@ public class MyNewTool
 ## 🛣️ Roadmap
 
 ### Recently Added
+- [x] MongoDB Database Tool with full CRUD operations
+- [x] Schema inference from sample documents
+- [x] MongoDB query support with filters, projections, and sorting
 - [x] Azure DevOps PR Review Tool with DiffPlex integration
 - [x] Security, Quality, and Best Practices analyzers
 - [x] Multiple diff formats (unified, side-by-side, inline)
@@ -605,6 +694,8 @@ public class MyNewTool
 - [ ] GitHub PR review support
 - [ ] GitLab MR review support
 - [ ] Additional database support (PostgreSQL, MySQL, SQLite)
+- [ ] MongoDB aggregation pipeline support
+- [ ] MongoDB change streams support
 - [ ] GraphQL API testing
 - [ ] WebSocket testing
 - [ ] File system operations tool
@@ -640,12 +731,14 @@ Contributions are welcome! Please follow these guidelines:
 
 - **Runtime**: .NET 8.0 or later
 - **SQL Tool**: SQL Server 2017+ (requires `STRING_AGG` function)
+- **MongoDB Tool**: MongoDB 3.6+ (MongoDB.Driver 2.28.0)
 - **Operating System**: Windows, Linux, or macOS
 - **MCP Client**: Any MCP-compatible AI assistant
 
 ### NuGet Dependencies
 - `DiffPlex` (^1.9.0) - Diff generation and analysis
 - `Microsoft.Data.SqlClient` (^6.1.2) - SQL Server connectivity
+- `MongoDB.Driver` (^2.28.0) - MongoDB connectivity
 - `Microsoft.Extensions.Hosting` (^8.0.1) - Hosting and DI infrastructure
 - `ModelContextProtocol` (^0.4.0-preview.3) - MCP server framework
 
@@ -657,6 +750,26 @@ Contributions are welcome! Please follow these guidelines:
 ```
 Error: "Connection string is not set"
 Solution: Set SQL_CONNECTION_STRING environment variable
+```
+
+### MongoDB Connection Issues
+```
+Error: "Connection string is not set in environment variable 'MONGODB_CONNECTION_STRING'"
+Solution: Set MONGODB_CONNECTION_STRING environment variable
+
+Error: "Authentication failed"
+Solution: 
+1. Verify credentials in connection string
+2. Ensure user exists in MongoDB with appropriate permissions
+3. Check if authentication database is correct (use ?authSource=admin if needed)
+
+Error: "A network-related error occurred"
+Solution:
+1. Check MongoDB server is running
+2. Verify server address/port in connection string
+3. Check firewall settings
+4. Ensure MongoDB is listening on the specified port (default: 27017)
+5. For MongoDB Atlas, verify network access list includes your IP
 ```
 
 ### MCP Server Not Detected
