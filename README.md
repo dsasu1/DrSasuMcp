@@ -65,6 +65,7 @@ Each of these is a standalone MCP server:
 - **DrSasuMcp.API** - HTTP API testing
 - **DrSasuMcp.AzureDevOps** - Pull request reviews
 - **DrSasuMcp.Datadog** - Monitoring and troubleshooting
+- **DrSasuMcp.Docker** - Docker container management
 
 Mix and match based on your needs!
 
@@ -98,6 +99,11 @@ Automated code review with security, quality, and best practice analysis for Azu
 Monitor, troubleshoot, and resolve issues with comprehensive Datadog integration and intelligent root cause analysis.
 
 **[📖 Full Documentation](DrSasuMcp.Datadog/README.md)**
+
+### 🐳 Docker Container Management Tool
+Docker container, image, network, and volume management through natural language commands.
+
+**[📖 Full Documentation](DrSasuMcp.Docker/README.md)**
 
 ---
 
@@ -296,13 +302,24 @@ DrSasuMcp/
 │       ├── Models/                      # Metric, Log, Trace models
 │       ├── Troubleshooters/             # Analysis engines
 │       └── Utils/                       # Query builders
+├── DrSasuMcp.Docker/                    # Docker Container MCP Server
+│   ├── Program.cs                       # Docker server entry point
+│   ├── DrSasuMcp.Docker.csproj
+│   ├── README.md                        # Docker tool documentation
+│   └── Docker/
+│       ├── DockerTool.cs                # MCP-exposed Docker operations
+│       ├── DockerClientFactory.cs
+│       ├── IDockerClientFactory.cs
+│       ├── DockerToolConstants.cs
+│       └── Models/                      # Container, Image, Network models
 └── Tests/                               # Test projects
     ├── DrSasuMcp.Tests/                 # Common tests
     ├── DrSasuMcp.Tests.SQL/             # SQL tool tests
     ├── DrSasuMcp.Tests.MongoDB/         # MongoDB tool tests
     ├── DrSasuMcp.Tests.API/             # API tool tests
     ├── DrSasuMcp.Tests.AzureDevOps/     # Azure DevOps tool tests
-    └── DrSasuMcp.Tests.Datadog/         # Datadog tool tests
+    ├── DrSasuMcp.Tests.Datadog/         # Datadog tool tests
+    └── DrSasuMcp.Tests.Docker/          # Docker tool tests
 ```
 
 ### Design Principles
@@ -375,6 +392,7 @@ Each tool has comprehensive documentation with setup guides, API references, and
 - **[API Tool →](DrSasuMcp.API/README.md)** - HTTP API testing
 - **[Azure DevOps Tool →](DrSasuMcp.AzureDevOps/README.md)** - PR reviews
 - **[Datadog Tool →](DrSasuMcp.Datadog/README.md)** - Monitoring & troubleshooting
+- **[Docker Tool →](DrSasuMcp.Docker/README.md)** - Docker container management
 - **[MCP Protocol →](https://modelcontextprotocol.io/)** - Model Context Protocol specification
 
 ---
@@ -421,7 +439,7 @@ Each tool implements security best practices:
 - [ ] WebSocket testing
 - [ ] File system operations tool
 - [ ] Cloud provider integration tools (AWS, Azure, GCP)
-- [ ] Docker container management
+- [x] Docker container management
 - [ ] Git operations tool
 - [ ] Kubernetes operations tool
 
