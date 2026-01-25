@@ -8,7 +8,7 @@
 
 ## 🌟 Overview
 
-DrSasuMcp brings **SQL Server and MongoDB database management**, **HTTP API testing**, **Azure DevOps PR review**, and **Datadog monitoring & troubleshooting** directly into your AI assistant conversations. Each capability is a standalone MCP server that can be deployed independently or together. Execute queries, manage schemas, test APIs, review pull requests, troubleshoot issues, and monitor systems—all through natural language commands.
+DrSasuMcp brings **SQL Server and MongoDB database management**, **HTTP API testing**, **Azure DevOps PR review**, **Datadog monitoring & troubleshooting**, and **Docker container management** directly into your AI assistant conversations. Each capability is a standalone MCP server that can be deployed independently or together. Execute queries, manage schemas, test APIs, review pull requests, troubleshoot issues, monitor systems, and manage containers—all through natural language commands.
 
 ### Why DrSasuMcp?
 
@@ -22,6 +22,23 @@ DrSasuMcp brings **SQL Server and MongoDB database management**, **HTTP API test
 - 📦 **Independent Deployment**: Each tool can be deployed, updated, and scaled independently
 - 🔒 **Isolation**: Issues in one tool don't affect others
 - ⚙️ **Flexible Configuration**: Configure only the tools you need with their specific settings
+
+---
+
+## 📥 Downloads
+
+Pre-built executables are available for quick setup. Download the tools you need:
+
+| Tool | Download | Published |
+|------|----------|-----------|
+| SQL Server Tool | [sql.zip](https://docsas.blob.core.windows.net/downloads/mcp/sql.zip) | January 25, 2026 |
+| MongoDB Tool | [mongo.zip](https://docsas.blob.core.windows.net/downloads/mcp/mongo.zip) | January 25, 2026 |
+| API Testing Tool | [api.zip](https://docsas.blob.core.windows.net/downloads/mcp/api.zip) | January 25, 2026 |
+| Azure DevOps Tool | [azuredevops.zip](https://docsas.blob.core.windows.net/downloads/mcp/azuredevops.zip) | January 25, 2026 |
+| Datadog Tool | [datadog.zip](https://docsas.blob.core.windows.net/downloads/mcp/datadog.zip) | January 25, 2026 |
+| Docker Tool | [docker.zip](https://docsas.blob.core.windows.net/downloads/mcp/docker.zip) | January 25, 2026 |
+
+> **Note:** Extract the zip file and configure the executable path in your MCP client configuration. See [Configuration](#configuration) for details.
 
 ---
 
@@ -73,7 +90,7 @@ Mix and match based on your needs!
 
 ## 📦 Available Tools
 
-DrSasuMcp provides five standalone MCP servers, each focused on a specific capability:
+DrSasuMcp provides six standalone MCP servers, each focused on a specific capability:
 
 ### 🗄️ SQL Database Tool
 Complete SQL Server management—explore schemas, execute queries, and manage data with comprehensive safety features.
@@ -156,6 +173,7 @@ Each tool is a separate MCP server. Configure only the ones you need in your Cla
 ```bash
 # Publish the tools you need
 dotnet publish DrSasuMcp.SQL/DrSasuMcp.SQL.csproj -c Release -o ./publish/sql
+dotnet publish DrSasuMcp.Docker/DrSasuMcp.Docker.csproj -c Release -o ./publish/docker
 ```
 
 ```json
@@ -166,6 +184,9 @@ dotnet publish DrSasuMcp.SQL/DrSasuMcp.SQL.csproj -c Release -o ./publish/sql
       "env": {
         "SQL_CONNECTION_STRING": "Server=.;Database=YourDatabase;Trusted_Connection=True;TrustServerCertificate=True"
       }
+    },
+    "drsasumcp-docker": {
+      "command": "C:\\Projects\\personal\\DrSasuMcp\\publish\\docker\\DrSasuMcp.Docker.exe"
     }
   }
 }
@@ -190,6 +211,10 @@ dotnet run
 
 # API Tool
 cd DrSasuMcp.API
+dotnet run
+
+# Docker Tool
+cd DrSasuMcp.Docker
 dotnet run
 ```
 
@@ -232,6 +257,14 @@ Once configured, you can interact with the tools through natural language:
 "Troubleshoot high error rate in payment-service"
 "Get active alerts from Datadog"
 "Show me the service map for payment-service"
+```
+
+**Docker Container Management:**
+```
+"List all running containers"
+"Create an nginx container with port 80 mapped to 8080"
+"Show me the logs from my-app container"
+"Pull the latest alpine image"
 ```
 
 > 📖 **See each tool's documentation for complete usage guides and examples.**
@@ -405,6 +438,7 @@ Each tool implements security best practices:
 - **API Tool**: SSL validation by default, secure credential storage, timeout protection
 - **Azure DevOps Tool**: Read-only access, PAT stored in environment variables only
 - **Datadog Tool**: API keys in environment variables, SSL validation enabled
+- **Docker Tool**: Destructive operations marked with safety flags, configurable Docker socket access
 
 > 📖 **For detailed security guidelines**, see individual tool documentation.
 
