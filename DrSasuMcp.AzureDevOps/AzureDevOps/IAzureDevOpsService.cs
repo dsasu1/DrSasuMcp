@@ -58,6 +58,22 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Gets the number of file changes in a pull request without fetching file content.
+        /// </summary>
+        /// <param name="organization">The Azure DevOps organization name.</param>
+        /// <param name="project">The project name.</param>
+        /// <param name="repository">The repository name.</param>
+        /// <param name="pullRequestId">The pull request ID.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Count of changed files (excluding folders).</returns>
+        Task<int> GetPullRequestChangesCountAsync(
+            string organization,
+            string project,
+            string repository,
+            int pullRequestId,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Tests the connection to Azure DevOps using the configured PAT.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token.</param>

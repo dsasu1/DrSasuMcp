@@ -158,9 +158,9 @@ AZURE_DEVOPS_PAT=your_personal_access_token
 
 #### Optional
 ```bash
-AZURE_DEVOPS_ORG=your_organization          # Default organization
-AZURE_DEVOPS_MAX_FILES=100                  # Max files to analyze
-AZURE_DEVOPS_TIMEOUT=60                     # Request timeout in seconds
+AZURE_DEVOPS_MAX_FILES=100                  # Max files to analyze per PR (default: 100)
+AZURE_DEVOPS_MAX_FILE_SIZE=1048576          # Max file size in bytes to fetch (default: 1MB). Files exceeding this are skipped.
+AZURE_DEVOPS_TIMEOUT=60                     # Request timeout in seconds (default: 60)
 ```
 
 ### Personal Access Token (PAT) Setup
@@ -225,6 +225,7 @@ Then configure:
       "env": {
         "AZURE_DEVOPS_PAT": "your_personal_access_token",
         "AZURE_DEVOPS_MAX_FILES": "100",
+        "AZURE_DEVOPS_MAX_FILE_SIZE": "1048576",
         "AZURE_DEVOPS_TIMEOUT": "60"
       }
     }
@@ -241,6 +242,7 @@ Then configure:
       "env": {
         "AZURE_DEVOPS_PAT": "your_personal_access_token",
         "AZURE_DEVOPS_MAX_FILES": "100",
+        "AZURE_DEVOPS_MAX_FILE_SIZE": "1048576",
         "AZURE_DEVOPS_TIMEOUT": "60"
       }
     }
@@ -327,6 +329,7 @@ AzureDevOpsTool
 ├── IAzureDevOpsService → REST API client
 │   ├── GetPullRequestInfoAsync()
 │   ├── GetPullRequestChangesAsync()
+│   ├── GetPullRequestChangesCountAsync()
 │   ├── GetFileContentAsync()
 │   └── TestConnectionAsync()
 │
@@ -438,7 +441,7 @@ AI calls GetPullRequestInfo
 ## Dependencies
 
 - **DiffPlex 1.9.0** - Diff generation
-- **System.Net.Http** - HTTP client
+- **Microsoft.Extensions.Http 8.0.1** - `IHttpClientFactory` for managed HTTP client lifetime
 - **System.Text.Json** - JSON parsing
 - **ModelContextProtocol** - MCP server integration
 

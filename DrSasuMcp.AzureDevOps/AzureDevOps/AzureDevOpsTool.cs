@@ -35,10 +35,6 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         /// <summary>
         /// Reviews an Azure DevOps Pull Request and provides code analysis with security, quality, and best practice insights.
         /// </summary>
-        /// <param name="prUrl">Full Azure DevOps PR URL (e.g., https://dev.azure.com/org/project/_git/repo/pullrequest/123)</param>
-        /// <param name="includeAnalyzers">Comma-separated list of analyzers to run: security,quality,bestpractices (default: all)</param>
-        /// <param name="minIssueLevel">Minimum issue level to report: info, warning, critical (default: info)</param>
-        /// <returns>Comprehensive review summary with all findings</returns>
         [McpServerTool(
             Title = "Azure: Review Azure DevOps Pull Request",
             ReadOnly = true,
@@ -47,10 +43,11 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             Description("Review an Azure DevOps Pull Request and provide comprehensive code analysis with security, quality, and best practice insights")]
         public async Task<OperationResult> AzureReviewPullRequest(
             [Description("Full Azure DevOps PR URL")] string prUrl,
-            [Description("Comma-separated analyzers: security,quality,bestpractices (default: all)")] 
+            [Description("Comma-separated analyzers: security,quality,bestpractices (default: all)")]
             string? includeAnalyzers = null,
-            [Description("Minimum issue level: info,warning,critical (default: info)")] 
-            string minIssueLevel = "info")
+            [Description("Minimum issue level: info,warning,critical (default: info)")]
+            string minIssueLevel = "info",
+            CancellationToken cancellationToken = default)
         {
             var stopwatch = Stopwatch.StartNew();
 
@@ -84,10 +81,10 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
                 }
 
                 // Fetch PR information
-                var prInfo = await _azureDevOpsService.GetPullRequestInfoAsync(org, project, repo, prId);
+                var prInfo = await _azureDevOpsService.GetPullRequestInfoAsync(org, project, repo, prId, cancellationToken);
 
                 // Fetch file changes
-                var fileChanges = await _azureDevOpsService.GetPullRequestChangesAsync(org, project, repo, prId);
+                var fileChanges = await _azureDevOpsService.GetPullRequestChangesAsync(org, project, repo, prId, cancellationToken);
 
                 if (!fileChanges.Any())
                 {
@@ -104,24 +101,16 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
                     );
                 }
 
-                // Analyze each file
-                var fileReviews = new List<FileReview>();
-                int totalAdditions = 0;
-                int totalDeletions = 0;
-
-                foreach (var fileChange in fileChanges)
+                // Analyze each file in parallel (content is already fetched)
+                var fileReviewTasks = fileChanges.Select(async fileChange =>
                 {
-                    totalAdditions += fileChange.Additions;
-                    totalDeletions += fileChange.Deletions;
-
                     var comments = new List<ReviewComment>();
 
-                    // Run selected analyzers
                     foreach (var analyzer in selectedAnalyzers)
                     {
                         if (analyzer.SupportsFileType(fileChange.FilePath))
                         {
-                            var analyzerComments = await analyzer.AnalyzeFileChangeAsync(fileChange);
+                            var analyzerComments = await analyzer.AnalyzeFileChangeAsync(fileChange, cancellationToken);
                             comments.AddRange(analyzerComments);
                         }
                     }
@@ -129,17 +118,21 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
                     // Filter by minimum issue level
                     comments = comments.Where(c => c.Level >= minLevel).ToList();
 
-                    fileReviews.Add(new FileReview
+                    return new FileReview
                     {
                         FilePath = fileChange.FilePath,
                         ChangeType = fileChange.ChangeType,
                         Additions = fileChange.Additions,
                         Deletions = fileChange.Deletions,
                         Comments = comments
-                    });
-                }
+                    };
+                });
+
+                var fileReviews = (await Task.WhenAll(fileReviewTasks)).ToList();
 
                 // Calculate summary statistics
+                var totalAdditions = fileReviews.Sum(fr => fr.Additions);
+                var totalDeletions = fileReviews.Sum(fr => fr.Deletions);
                 var allComments = fileReviews.SelectMany(fr => fr.Comments).ToList();
                 var criticalIssues = allComments.Count(c => c.Level == IssueLevel.Critical);
                 var warnings = allComments.Count(c => c.Level == IssueLevel.Warning);
@@ -203,10 +196,6 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         /// <summary>
         /// Gets detailed diff for a Pull Request or specific file, showing line-by-line changes.
         /// </summary>
-        /// <param name="prUrl">Full Azure DevOps PR URL</param>
-        /// <param name="filePath">Optional: specific file path to get diff for (e.g., src/Program.cs)</param>
-        /// <param name="diffFormat">Diff format: unified, sidebyside, inline (default: unified)</param>
-        /// <returns>Diff results for the requested file(s)</returns>
         [McpServerTool(
             Title = "Azure: Get Pull Request Diff",
             ReadOnly = true,
@@ -216,8 +205,9 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         public async Task<OperationResult> AzureGetPullRequestDiff(
             [Description("Full Azure DevOps PR URL")] string prUrl,
             [Description("Optional: specific file path to get diff for")] string? filePath = null,
-            [Description("Diff format: unified, sidebyside, inline (default: unified)")] 
-            string diffFormat = "unified")
+            [Description("Diff format: unified, sidebyside, inline (default: unified)")]
+            string diffFormat = "unified",
+            CancellationToken cancellationToken = default)
         {
             try
             {
@@ -236,14 +226,14 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
                 var (org, project, repo, prId) = parsed.Value;
 
                 // Fetch file changes
-                var fileChanges = await _azureDevOpsService.GetPullRequestChangesAsync(org, project, repo, prId);
+                var fileChanges = await _azureDevOpsService.GetPullRequestChangesAsync(org, project, repo, prId, cancellationToken);
 
-                _logger.LogInformation("Fetched {Count} file changes from PR", fileChanges.Count());
+                _logger.LogInformation("Fetched {Count} file changes from PR", fileChanges.Count);
 
                 // Filter by file path if specified
                 if (!string.IsNullOrWhiteSpace(filePath))
                 {
-                    fileChanges = fileChanges.Where(fc => 
+                    fileChanges = fileChanges.Where(fc =>
                         fc.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
                         fc.FilePath.EndsWith(filePath, StringComparison.OrdinalIgnoreCase))
                         .ToList();
@@ -261,14 +251,13 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
                 var diffs = new List<DiffResultModel>();
                 foreach (var fileChange in fileChanges)
                 {
-                    // Log if content is missing
                     if (string.IsNullOrEmpty(fileChange.OriginalContent) && string.IsNullOrEmpty(fileChange.ModifiedContent))
                     {
                         _logger.LogWarning("Both original and modified content are empty for {FilePath}", fileChange.FilePath);
                     }
 
                     _logger.LogDebug("Generating {Format} diff for {FilePath} (Original: {OldLength} chars, Modified: {NewLength} chars)",
-                        diffFormat, fileChange.FilePath, 
+                        diffFormat, fileChange.FilePath,
                         fileChange.OriginalContent?.Length ?? 0,
                         fileChange.ModifiedContent?.Length ?? 0);
 
@@ -300,8 +289,6 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         /// <summary>
         /// Gets Pull Request metadata including title, author, status, and file count without performing analysis.
         /// </summary>
-        /// <param name="prUrl">Full Azure DevOps PR URL</param>
-        /// <returns>Pull request metadata</returns>
         [McpServerTool(
             Title = "Azure: Get Pull Request Info",
             ReadOnly = true,
@@ -309,7 +296,8 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             Destructive = false),
             Description("Get Pull Request metadata including title, author, status, and file count without performing analysis")]
         public async Task<OperationResult> AzureGetPullRequestInfo(
-            [Description("Full Azure DevOps PR URL")] string prUrl)
+            [Description("Full Azure DevOps PR URL")] string prUrl,
+            CancellationToken cancellationToken = default)
         {
             try
             {
@@ -327,12 +315,14 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
 
                 var (org, project, repo, prId) = parsed.Value;
 
-                // Fetch PR information
-                var prInfo = await _azureDevOpsService.GetPullRequestInfoAsync(org, project, repo, prId);
+                // Fetch PR information and file count in parallel
+                var prInfoTask = _azureDevOpsService.GetPullRequestInfoAsync(org, project, repo, prId, cancellationToken);
+                var fileCountTask = _azureDevOpsService.GetPullRequestChangesCountAsync(org, project, repo, prId, cancellationToken);
 
-                // Get file count
-                var fileChanges = await _azureDevOpsService.GetPullRequestChangesAsync(org, project, repo, prId);
-                prInfo.TotalFiles = fileChanges.Count;
+                await Task.WhenAll(prInfoTask, fileCountTask);
+
+                var prInfo = await prInfoTask;
+                prInfo.TotalFiles = await fileCountTask;
 
                 return new OperationResult(success: true, data: prInfo);
             }
@@ -349,20 +339,19 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         /// <summary>
         /// Tests the connection to Azure DevOps using the configured Personal Access Token.
         /// </summary>
-        /// <returns>Connection test result</returns>
         [McpServerTool(
             Title = "Azure: Test Azure DevOps Connection",
             ReadOnly = true,
             Idempotent = true,
             Destructive = false),
             Description("Test the connection to Azure DevOps using the configured Personal Access Token and verify authentication")]
-        public async Task<OperationResult> AzureTestConnection()
+        public async Task<OperationResult> AzureTestConnection(CancellationToken cancellationToken = default)
         {
             try
             {
                 _logger.LogInformation("Testing Azure DevOps connection");
 
-                var isConnected = await _azureDevOpsService.TestConnectionAsync();
+                var isConnected = await _azureDevOpsService.TestConnectionAsync(cancellationToken);
 
                 if (isConnected)
                 {
@@ -426,4 +415,3 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         }
     }
 }
-

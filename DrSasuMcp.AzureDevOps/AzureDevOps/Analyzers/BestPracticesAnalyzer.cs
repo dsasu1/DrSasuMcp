@@ -21,13 +21,23 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps.Analyzers
             ["BP002"] = new Regex(@"catch\s*\([^)]+\)\s*\{\s*//", RegexOptions.Compiled),
             ["BP003"] = new Regex(@"\.Result\b", RegexOptions.Compiled),
             ["BP004"] = new Regex(@"\.Wait\(\)", RegexOptions.Compiled),
-            ["BP005"] = new Regex(@"string\s+\w+\s*=\s*"""";(\s*\w+\s*\+=)", RegexOptions.Compiled),
+            // BP005 is checked contextually in CheckStringConcatenation (multi-line analysis)
             ["BP006"] = new Regex(@"==\s*null\b", RegexOptions.Compiled),
             ["BP007"] = new Regex(@"!=\s*null\b", RegexOptions.Compiled),
             ["BP008"] = new Regex(@"class\s+\w+\s*:\s*IDisposable", RegexOptions.Compiled),
             ["BP009"] = new Regex(@"new\s+HttpClient\s*\(", RegexOptions.Compiled),
             ["BP010"] = new Regex(@"Console\.WriteLine", RegexOptions.Compiled)
         };
+
+        // Matches: string varName = ""; or string varName = string.Empty;
+        private static readonly Regex StringEmptyInitPattern = new(
+            @"string\s+(\w+)\s*=\s*(?:""""|\s*string\.Empty)", RegexOptions.Compiled);
+        // Matches loop keywords
+        private static readonly Regex LoopKeywordPattern = new(
+            @"\b(for|foreach|while)\b", RegexOptions.Compiled);
+        // Matches varName += (anything)
+        private static readonly Regex StringConcatAssignPattern = new(
+            @"\b(\w+)\s*\+=", RegexOptions.Compiled);
 
         private static readonly Dictionary<string, string> BestPracticeMessages = new()
         {
@@ -110,6 +120,7 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps.Analyzers
             CheckAsyncPatterns(lines, fileChange.FilePath, comments);
             CheckResourceManagement(lines, fileChange.FilePath, comments);
             CheckErrorHandling(lines, fileChange.FilePath, comments);
+            CheckStringConcatenation(lines, fileChange.FilePath, comments);
 
             return Task.FromResult(comments);
         }
@@ -165,8 +176,9 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps.Analyzers
         private void CheckResourceManagement(string[] lines, string filePath, List<ReviewComment> comments)
         {
             // Check for disposable objects not in using statements
+            // Matches both `using (...)` blocks and C# 8+ `using var` declarations
             var disposableCreationPattern = new Regex(@"new\s+(FileStream|StreamReader|StreamWriter|SqlConnection|HttpClient)\s*\(", RegexOptions.Compiled);
-            var usingPattern = new Regex(@"\busing\s*\(", RegexOptions.Compiled);
+            var usingPattern = new Regex(@"\busing\s*(?:\(|var\b)", RegexOptions.Compiled);
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -217,6 +229,45 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps.Analyzers
                         CodeSnippet = line.Trim(),
                         Suggestion = "Catch specific exception types when possible for better error handling"
                     });
+                }
+            }
+        }
+
+        private void CheckStringConcatenation(string[] lines, string filePath, List<ReviewComment> comments)
+        {
+            // Detect string variable initialized to empty then concatenated with += within a loop,
+            // which is the classic StringBuilder anti-pattern.
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var initMatch = StringEmptyInitPattern.Match(lines[i]);
+                if (!initMatch.Success)
+                    continue;
+
+                var varName = initMatch.Groups[1].Value;
+                var concatPattern = new Regex($@"\b{Regex.Escape(varName)}\s*\+=", RegexOptions.Compiled);
+
+                // Look ahead up to 30 lines for: a loop keyword followed by += on the same variable
+                bool sawLoop = false;
+                for (int j = i + 1; j < Math.Min(i + 31, lines.Length); j++)
+                {
+                    if (LoopKeywordPattern.IsMatch(lines[j]))
+                        sawLoop = true;
+
+                    if (sawLoop && concatPattern.IsMatch(lines[j]))
+                    {
+                        comments.Add(new ReviewComment
+                        {
+                            FilePath = filePath,
+                            Line = j + 1,
+                            Level = IssueLevel.Warning,
+                            Analyzer = AnalyzerName,
+                            Code = "BP005",
+                            Message = "String concatenation in loop detected - use StringBuilder",
+                            CodeSnippet = lines[j].Trim(),
+                            Suggestion = "Use StringBuilder for string concatenation in loops"
+                        });
+                        break;
+                    }
                 }
             }
         }

@@ -116,29 +116,35 @@ namespace DrSasuMcp.Datadog.Datadog
         public const string GetDashboardEndpoint = "/api/v1/dashboard/{0}";
 
         /// <summary>
-        /// Endpoint to query events.
+        /// Endpoint to search events (v2).
         /// </summary>
-        public const string QueryEventsEndpoint = "/api/v1/events";
+        public const string QueryEventsEndpoint = "/api/v2/events/search";
 
         /// <summary>
-        /// Endpoint to create event.
+        /// Endpoint to create event (v1, still current).
         /// </summary>
         public const string CreateEventEndpoint = "/api/v1/events";
 
         /// <summary>
-        /// Endpoint to get service map.
+        /// Endpoint to get service dependencies (APM service map).
+        /// Requires env query parameter (from DD_ENV).
         /// </summary>
-        public const string GetServiceMapEndpoint = "/api/v1/service_map";
+        public const string GetServiceMapEndpoint = "/api/v1/service_dependencies";
 
         /// <summary>
-        /// Endpoint to query traces.
+        /// Endpoint to query APM spans/traces (v2).
         /// </summary>
-        public const string QueryTracesEndpoint = "/api/v0.2/traces";
+        public const string QueryTracesEndpoint = "/api/v2/spans/events/search";
 
         /// <summary>
-        /// Endpoint to get error tracking events.
+        /// Endpoint to search error tracking issues (v2, grouped errors).
         /// </summary>
-        public const string GetErrorTrackingEventsEndpoint = "/api/v1/rum/error-tracking/events";
+        public const string GetErrorTrackingEventsEndpoint = "/api/v2/error-tracking/issues/search";
+
+        /// <summary>
+        /// Environment variable name for the default Datadog environment tag.
+        /// </summary>
+        public const string EnvDatadogEnv = "DD_ENV";
 
         // HTTP Headers
         /// <summary>

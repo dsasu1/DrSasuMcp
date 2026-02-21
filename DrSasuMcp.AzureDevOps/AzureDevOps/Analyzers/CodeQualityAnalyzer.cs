@@ -19,7 +19,20 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps.Analyzers
         private static readonly Regex MagicNumberPattern = new(@"\b\d{2,}\b(?!\s*;)", RegexOptions.Compiled);
         private static readonly Regex TodoCommentPattern = new(@"(TODO|FIXME|HACK|XXX):", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex LongLinePattern = new(@"^.{120,}", RegexOptions.Compiled);
-        private static readonly Regex DuplicateCodePattern = new(@"^(\s*)(.+)$", RegexOptions.Compiled);
+
+        // Pre-compiled complexity keyword regexes (avoids allocating Regex per-line in the loop)
+        private static readonly Regex[] ComplexityKeywordPatterns =
+        [
+            new Regex(@"\bif\b",      RegexOptions.Compiled),
+            new Regex(@"\belse\b",    RegexOptions.Compiled),
+            new Regex(@"\bfor\b",     RegexOptions.Compiled),
+            new Regex(@"\bforeach\b", RegexOptions.Compiled),
+            new Regex(@"\bwhile\b",   RegexOptions.Compiled),
+            new Regex(@"\bcase\b",    RegexOptions.Compiled),
+            new Regex(@"\bcatch\b",   RegexOptions.Compiled),
+            new Regex(@"&&",          RegexOptions.Compiled),
+            new Regex(@"\|\|",        RegexOptions.Compiled),
+        ];
 
         public CodeQualityAnalyzer(ILogger<CodeQualityAnalyzer> logger)
         {
@@ -189,13 +202,10 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps.Analyzers
         private void AnalyzeComplexity(string[] lines, string filePath, List<ReviewComment> comments)
         {
             // Simple cyclomatic complexity check based on control flow keywords
-            var complexityKeywords = new[] { "if", "else", "for", "foreach", "while", "case", "catch", "&&", "||" };
-
             for (int i = 0; i < lines.Length; i++)
             {
                 var line = lines[i];
-                var complexity = complexityKeywords.Sum(keyword => 
-                    Regex.Matches(line, $@"\b{Regex.Escape(keyword)}\b").Count);
+                var complexity = ComplexityKeywordPatterns.Sum(pattern => pattern.Matches(line).Count);
 
                 if (complexity >= 5)
                 {

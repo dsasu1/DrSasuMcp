@@ -26,6 +26,11 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         /// </summary>
         public const string EnvAzureDevOpsTimeout = "AZURE_DEVOPS_TIMEOUT";
 
+        /// <summary>
+        /// Environment variable name for maximum file size to analyze in bytes.
+        /// </summary>
+        public const string EnvAzureDevOpsMaxFileSize = "AZURE_DEVOPS_MAX_FILE_SIZE";
+
         // Default Values
         /// <summary>
         /// Default timeout for HTTP requests in seconds.

@@ -19,6 +19,9 @@ namespace DrSasuMcp.AzureDevOps
                 consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Trace;
             });
 
+            // Register HttpClient via factory (avoids socket exhaustion from new HttpClient())
+            builder.Services.AddHttpClient(nameof(AzureDevOpsService));
+
             // Register Azure DevOps Tool dependencies
             builder.Services.AddSingleton<IAzureDevOpsService, AzureDevOpsService>();
             builder.Services.AddSingleton<IDiffService, DiffService>();

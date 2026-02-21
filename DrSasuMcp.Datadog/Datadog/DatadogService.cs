@@ -285,22 +285,20 @@ namespace DrSasuMcp.Datadog.Datadog
                 ValidateAuthentication();
 
                 var endpoint = DatadogToolConstants.QueryLogsEndpoint;
-                var fromUnix = ((DateTimeOffset)from).ToUnixTimeMilliseconds();
-                var toUnix = ((DateTimeOffset)to).ToUnixTimeMilliseconds();
-                
+
                 var requestBody = new
                 {
                     filter = new
                     {
                         query,
-                        from = fromUnix,
-                        to = toUnix
+                        from = from.ToUniversalTime().ToString("O"),
+                        to = to.ToUniversalTime().ToString("O")
                     },
                     page = new
                     {
                         limit = limit ?? _maxResults
                     },
-                    sort = "timestamp"
+                    sort = "-timestamp"
                 };
 
                 var json = JsonSerializer.Serialize(requestBody);
@@ -376,8 +374,11 @@ namespace DrSasuMcp.Datadog.Datadog
                     
                     if (metaElement.TryGetProperty("page", out var pageElement))
                     {
-                        // Handle both int and string types
-                        if (pageElement.ValueKind == JsonValueKind.Number)
+                        // v2: page is an object { "after": "<cursor>" }
+                        if (pageElement.ValueKind == JsonValueKind.Object &&
+                            pageElement.TryGetProperty("after", out var afterEl))
+                            result.Meta.Page = afterEl.GetString();
+                        else if (pageElement.ValueKind == JsonValueKind.Number)
                             result.Meta.Page = pageElement.GetInt32();
                         else if (pageElement.ValueKind == JsonValueKind.String)
                             result.Meta.Page = pageElement.GetString();
@@ -410,58 +411,80 @@ namespace DrSasuMcp.Datadog.Datadog
 
         /// <summary>
         /// Parses a single log event from a JsonElement.
+        /// Handles both v2 format (fields inside attributes) and legacy v1 format (fields at top level).
         /// </summary>
         private LogEvent ParseLogEvent(JsonElement eventElement)
         {
             var logEvent = new LogEvent();
-            
+
             if (eventElement.TryGetProperty("id", out var idElement))
                 logEvent.Id = idElement.GetString();
-            
-            if (eventElement.TryGetProperty("content", out var contentElement))
-                logEvent.Content = contentElement.GetString();
-            
+
+            // v2 format: timestamp, service, status, message and tags are inside attributes
             if (eventElement.TryGetProperty("attributes", out var attrsElement) && attrsElement.ValueKind == JsonValueKind.Object)
             {
                 logEvent.Attributes = ParseAttributes(attrsElement);
-            }
-            
-            if (eventElement.TryGetProperty("tags", out var tagsElement) && tagsElement.ValueKind == JsonValueKind.Array)
-            {
-                logEvent.Tags = new Dictionary<string, string>();
-                foreach (var tagElement in tagsElement.EnumerateArray())
+
+                if (attrsElement.TryGetProperty("message", out var msgEl))
+                    logEvent.Content = msgEl.GetString();
+
+                if (attrsElement.TryGetProperty("timestamp", out var tsEl))
                 {
-                    var tagStr = tagElement.GetString();
-                    if (!string.IsNullOrEmpty(tagStr))
-                    {
-                        var parts = tagStr.Split(':');
-                        if (parts.Length >= 2)
-                        {
-                            logEvent.Tags[parts[0]] = string.Join(":", parts.Skip(1));
-                        }
-                        else
-                        {
-                            logEvent.Tags[tagStr] = string.Empty;
-                        }
-                    }
+                    if (tsEl.ValueKind == JsonValueKind.String &&
+                        DateTime.TryParse(tsEl.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+                        logEvent.Timestamp = dt.ToUniversalTime();
+                }
+
+                if (attrsElement.TryGetProperty("service", out var svcEl))
+                    logEvent.Service = svcEl.GetString();
+
+                if (attrsElement.TryGetProperty("status", out var statusEl))
+                    logEvent.Status = statusEl.GetString();
+
+                if (attrsElement.TryGetProperty("tags", out var innerTagsEl) && innerTagsEl.ValueKind == JsonValueKind.Array)
+                {
+                    logEvent.Tags = ParseTagsArray(innerTagsEl);
                 }
             }
-            
-            if (eventElement.TryGetProperty("timestamp", out var timestampElement))
+
+            // Fallback: legacy v1 top-level fields
+            if (logEvent.Content == null && eventElement.TryGetProperty("content", out var contentElement))
+                logEvent.Content = contentElement.GetString();
+
+            if (logEvent.Tags == null && eventElement.TryGetProperty("tags", out var tagsElement) && tagsElement.ValueKind == JsonValueKind.Array)
+                logEvent.Tags = ParseTagsArray(tagsElement);
+
+            if (logEvent.Timestamp == null && eventElement.TryGetProperty("timestamp", out var timestampElement))
             {
                 if (timestampElement.ValueKind == JsonValueKind.Number && timestampElement.TryGetInt64(out var timestampMs))
+                    logEvent.Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(timestampMs).UtcDateTime;
+            }
+
+            if (logEvent.Service == null && eventElement.TryGetProperty("service", out var serviceElement))
+                logEvent.Service = serviceElement.GetString();
+
+            if (logEvent.Status == null && eventElement.TryGetProperty("status", out var eventStatusElement))
+                logEvent.Status = eventStatusElement.GetString();
+
+            return logEvent;
+        }
+
+        private static Dictionary<string, string> ParseTagsArray(JsonElement tagsElement)
+        {
+            var tags = new Dictionary<string, string>();
+            foreach (var tagElement in tagsElement.EnumerateArray())
+            {
+                var tagStr = tagElement.GetString();
+                if (!string.IsNullOrEmpty(tagStr))
                 {
-                    logEvent.Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(timestampMs).DateTime;
+                    var colonIdx = tagStr.IndexOf(':');
+                    if (colonIdx > 0)
+                        tags[tagStr[..colonIdx]] = tagStr[(colonIdx + 1)..];
+                    else
+                        tags[tagStr] = string.Empty;
                 }
             }
-            
-            if (eventElement.TryGetProperty("service", out var serviceElement))
-                logEvent.Service = serviceElement.GetString();
-            
-            if (eventElement.TryGetProperty("status", out var eventStatusElement))
-                logEvent.Status = eventStatusElement.GetString();
-            
-            return logEvent;
+            return tags;
         }
 
         /// <summary>
@@ -532,46 +555,117 @@ namespace DrSasuMcp.Datadog.Datadog
             {
                 ValidateAuthentication();
 
-                var endpoint = DatadogToolConstants.QueryTracesEndpoint;
-                var fromUnix = ((DateTimeOffset)from).ToUnixTimeSeconds();
-                var toUnix = ((DateTimeOffset)to).ToUnixTimeSeconds();
-
-                var url = $"{endpoint}?query={Uri.EscapeDataString(query)}&from={fromUnix}&to={toUnix}";
-                if (limit.HasValue)
+                var requestBody = new
                 {
-                    url += $"&limit={limit.Value}";
-                }
+                    filter = new
+                    {
+                        query,
+                        from = from.ToUniversalTime().ToString("O"),
+                        to = to.ToUniversalTime().ToString("O")
+                    },
+                    page = new { limit = limit ?? Math.Min(_maxResults, 1000) },
+                    sort = "-timestamp"
+                };
 
-                var response = await _httpClient.GetAsync(url, cancellationToken);
-                
-                // Handle 404 gracefully - APM/traces may not be enabled
+                var json = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync(DatadogToolConstants.QueryTracesEndpoint, content, cancellationToken);
+
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    _logger.LogWarning("Traces endpoint returned 404 - APM may not be enabled or endpoint may not be available");
+                    _logger.LogWarning("Spans endpoint returned 404 - APM may not be enabled");
                     return new TraceQueryResult
                     {
                         Traces = new List<Trace>(),
                         Status = "not_found",
-                        Error = "Traces endpoint not found. APM (Application Performance Monitoring) may not be enabled in this account, or the endpoint may not be available via API."
+                        Error = "APM spans endpoint not found. APM may not be enabled in this account."
                     };
                 }
 
                 response.EnsureSuccessStatusCode();
 
-                var content = await response.Content.ReadAsStringAsync(cancellationToken);
-                var result = JsonSerializer.Deserialize<TraceQueryResult>(content,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                using var doc = JsonDocument.Parse(responseContent);
+                var root = doc.RootElement;
 
-                return result;
+                var spansByTraceId = new Dictionary<string, List<Span>>();
+
+                if (root.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var spanElement in dataElement.EnumerateArray())
+                    {
+                        var span = new Span();
+
+                        if (spanElement.TryGetProperty("id", out var idEl))
+                            span.SpanId = idEl.GetString();
+
+                        if (spanElement.TryGetProperty("attributes", out var attrsEl) && attrsEl.ValueKind == JsonValueKind.Object)
+                        {
+                            if (attrsEl.TryGetProperty("service", out var svcEl)) span.Service = svcEl.GetString();
+                            if (attrsEl.TryGetProperty("name", out var nameEl)) span.Name = nameEl.GetString();
+                            if (attrsEl.TryGetProperty("resource_name", out var resEl)) span.Resource = resEl.GetString();
+                            if (attrsEl.TryGetProperty("type", out var typeEl)) span.Type = typeEl.GetString();
+                            if (attrsEl.TryGetProperty("duration", out var durEl) && durEl.TryGetInt64(out var dur)) span.Duration = dur;
+                            if (attrsEl.TryGetProperty("trace_id", out var traceIdEl)) span.TraceId = traceIdEl.GetString();
+                            if (attrsEl.TryGetProperty("span_id", out var spanIdEl)) span.SpanId = spanIdEl.GetString();
+                            if (attrsEl.TryGetProperty("parent_id", out var parentIdEl)) span.ParentId = parentIdEl.GetString();
+
+                            if (attrsEl.TryGetProperty("timestamp", out var tsEl) && tsEl.ValueKind == JsonValueKind.String &&
+                                DateTime.TryParse(tsEl.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+                                span.Start = dt.ToUniversalTime();
+
+                            // Custom attributes may also contain trace/span IDs
+                            if (attrsEl.TryGetProperty("custom", out var customEl) && customEl.ValueKind == JsonValueKind.Object)
+                            {
+                                if (span.TraceId == null && customEl.TryGetProperty("trace_id", out var ctEl)) span.TraceId = ctEl.GetString();
+                                if (span.SpanId == null && customEl.TryGetProperty("span_id", out var csEl)) span.SpanId = csEl.GetString();
+                                if (span.ParentId == null && customEl.TryGetProperty("parent_id", out var cpEl)) span.ParentId = cpEl.GetString();
+                                span.Meta = ParseAttributes(customEl);
+                            }
+
+                            if (attrsEl.TryGetProperty("tags", out var tagsEl) && tagsEl.ValueKind == JsonValueKind.Array)
+                            {
+                                span.Meta ??= new Dictionary<string, object>();
+                                span.Meta["tags"] = tagsEl.EnumerateArray()
+                                    .Select(t => t.GetString())
+                                    .Where(t => t != null)
+                                    .Cast<object>()
+                                    .ToList();
+                            }
+                        }
+
+                        var traceId = span.TraceId ?? span.SpanId ?? Guid.NewGuid().ToString();
+                        span.TraceId = traceId;
+
+                        if (!spansByTraceId.TryGetValue(traceId, out var spanList))
+                        {
+                            spanList = new List<Span>();
+                            spansByTraceId[traceId] = spanList;
+                        }
+                        spanList.Add(span);
+                    }
+                }
+
+                var traces = spansByTraceId.Select(kvp => new Trace
+                {
+                    TraceId = kvp.Key,
+                    Service = kvp.Value.FirstOrDefault()?.Service,
+                    StartTime = kvp.Value.Min(s => s.Start),
+                    Duration = kvp.Value.Sum(s => s.Duration ?? 0),
+                    Spans = kvp.Value
+                }).ToList();
+
+                return new TraceQueryResult { Traces = traces, Status = "ok" };
             }
             catch (HttpRequestException httpEx) when (httpEx.Message.Contains("404"))
             {
-                _logger.LogWarning(httpEx, "Traces endpoint not found - APM may not be enabled");
+                _logger.LogWarning(httpEx, "Spans endpoint not found - APM may not be enabled");
                 return new TraceQueryResult
                 {
                     Traces = new List<Trace>(),
                     Status = "not_found",
-                    Error = "Traces endpoint not found. APM (Application Performance Monitoring) may not be enabled in this account, or the endpoint may not be available via API."
+                    Error = "APM spans endpoint not found. APM may not be enabled in this account."
                 };
             }
             catch (Exception ex)
@@ -684,64 +778,103 @@ namespace DrSasuMcp.Datadog.Datadog
             {
                 ValidateAuthentication();
 
-                var endpoint = DatadogToolConstants.GetErrorTrackingEventsEndpoint;
-                var url = endpoint;
-                
-                var queryParams = new List<string>();
+                var queryParts = new List<string>();
                 if (!string.IsNullOrWhiteSpace(serviceName))
-                {
-                    queryParams.Add($"service={Uri.EscapeDataString(serviceName)}");
-                }
-                if (from.HasValue)
-                {
-                    var fromUnix = ((DateTimeOffset)from.Value).ToUnixTimeSeconds();
-                    queryParams.Add($"from={fromUnix}");
-                }
-                if (to.HasValue)
-                {
-                    var toUnix = ((DateTimeOffset)to.Value).ToUnixTimeSeconds();
-                    queryParams.Add($"to={toUnix}");
-                }
-                if (minCount.HasValue)
-                {
-                    queryParams.Add($"min_count={minCount.Value}");
-                }
+                    queryParts.Add($"service:{serviceName}");
 
-                if (queryParams.Any())
+                var requestBody = new
                 {
-                    url += "?" + string.Join("&", queryParams);
-                }
+                    filter = new
+                    {
+                        query = string.Join(" ", queryParts),
+                        from = (from ?? DateTime.UtcNow.AddHours(-24)).ToUniversalTime().ToString("O"),
+                        to = (to ?? DateTime.UtcNow).ToUniversalTime().ToString("O")
+                    },
+                    page = new { limit = _maxResults }
+                };
 
-                var response = await _httpClient.GetAsync(url, cancellationToken);
-                
-                // Handle 404 gracefully - RUM error tracking may not be enabled
+                var json = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync(DatadogToolConstants.GetErrorTrackingEventsEndpoint, content, cancellationToken);
+
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    _logger.LogWarning("Error tracking endpoint returned 404 - RUM error tracking may not be enabled");
+                    _logger.LogWarning("Error tracking endpoint returned 404 - error tracking may not be enabled");
                     return new ErrorTrackingResult
                     {
                         Issues = new List<ErrorIssue>(),
                         Status = "not_found",
-                        Error = "Error tracking endpoint not found. RUM error tracking may not be enabled in this account."
+                        Error = "Error tracking endpoint not found. Error Tracking may not be enabled in this account."
                     };
                 }
 
                 response.EnsureSuccessStatusCode();
 
-                var content = await response.Content.ReadAsStringAsync(cancellationToken);
-                var result = JsonSerializer.Deserialize<ErrorTrackingResult>(content,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                using var doc = JsonDocument.Parse(responseContent);
+                var root = doc.RootElement;
+
+                var result = new ErrorTrackingResult();
+                var issues = new List<ErrorIssue>();
+
+                if (root.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in dataElement.EnumerateArray())
+                    {
+                        var issue = new ErrorIssue();
+
+                        if (item.TryGetProperty("id", out var idEl)) issue.Id = idEl.GetString();
+                        if (item.TryGetProperty("type", out var typeEl)) issue.Type = typeEl.GetString();
+
+                        if (item.TryGetProperty("attributes", out var attrsEl) && attrsEl.ValueKind == JsonValueKind.Object)
+                        {
+                            if (attrsEl.TryGetProperty("message", out var msgEl)) issue.Message = msgEl.GetString();
+                            if (attrsEl.TryGetProperty("status", out var statusEl)) issue.Status = statusEl.GetString();
+                            if (attrsEl.TryGetProperty("service", out var svcEl)) issue.Service = svcEl.GetString();
+
+                            if (attrsEl.TryGetProperty("first_seen", out var fsEl) && fsEl.ValueKind == JsonValueKind.String &&
+                                DateTime.TryParse(fsEl.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var fs))
+                                issue.FirstSeen = fs.ToUniversalTime();
+
+                            if (attrsEl.TryGetProperty("last_seen", out var lsEl) && lsEl.ValueKind == JsonValueKind.String &&
+                                DateTime.TryParse(lsEl.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var ls))
+                                issue.LastSeen = ls.ToUniversalTime();
+
+                            if (attrsEl.TryGetProperty("total_occurrences", out var countEl) && countEl.TryGetInt32(out var count))
+                                issue.Count = count;
+
+                            if (attrsEl.TryGetProperty("tags", out var tagsEl) && tagsEl.ValueKind == JsonValueKind.Array)
+                                issue.Tags = tagsEl.EnumerateArray()
+                                    .Select(t => t.GetString())
+                                    .Where(t => t != null)
+                                    .Cast<string>()
+                                    .ToList();
+
+                            issue.Attributes = ParseAttributes(attrsEl);
+                        }
+
+                        if (minCount.HasValue && (issue.Count ?? 0) < minCount.Value)
+                            continue;
+
+                        issues.Add(issue);
+                    }
+                }
+
+                result.Issues = issues;
+                result.TotalCount = issues.Count;
+                result.Status = "ok";
 
                 return result;
             }
             catch (HttpRequestException httpEx) when (httpEx.Message.Contains("404"))
             {
-                _logger.LogWarning(httpEx, "Error tracking endpoint not found - RUM may not be enabled");
+                _logger.LogWarning(httpEx, "Error tracking endpoint not found");
                 return new ErrorTrackingResult
                 {
                     Issues = new List<ErrorIssue>(),
                     Status = "not_found",
-                    Error = "Error tracking endpoint not found. RUM error tracking may not be enabled in this account."
+                    Error = "Error tracking endpoint not found. Error Tracking may not be enabled in this account."
                 };
             }
             catch (Exception ex)
@@ -762,77 +895,95 @@ namespace DrSasuMcp.Datadog.Datadog
             {
                 ValidateAuthentication();
 
-                var endpoint = DatadogToolConstants.GetServiceMapEndpoint;
-                var url = endpoint;
-                
                 var queryParams = new List<string>();
-                if (!string.IsNullOrWhiteSpace(serviceName))
-                {
-                    queryParams.Add($"service={Uri.EscapeDataString(serviceName)}");
-                }
-                if (from.HasValue)
-                {
-                    var fromUnix = ((DateTimeOffset)from.Value).ToUnixTimeSeconds();
-                    queryParams.Add($"from={fromUnix}");
-                }
-                if (to.HasValue)
-                {
-                    var toUnix = ((DateTimeOffset)to.Value).ToUnixTimeSeconds();
-                    queryParams.Add($"to={toUnix}");
-                }
 
+                // env is required by the service_dependencies endpoint
+                var env = GetStringFromEnv(DatadogToolConstants.EnvDatadogEnv, string.Empty);
+                if (!string.IsNullOrWhiteSpace(env))
+                    queryParams.Add($"env={Uri.EscapeDataString(env)}");
+
+                if (from.HasValue)
+                    queryParams.Add($"start={((DateTimeOffset)from.Value).ToUnixTimeSeconds()}");
+                if (to.HasValue)
+                    queryParams.Add($"end={((DateTimeOffset)to.Value).ToUnixTimeSeconds()}");
+
+                var url = DatadogToolConstants.GetServiceMapEndpoint;
                 if (queryParams.Any())
-                {
                     url += "?" + string.Join("&", queryParams);
-                }
 
                 var response = await _httpClient.GetAsync(url, cancellationToken);
-                
-                // Handle 404 gracefully - Service map may not be available via API
+
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    _logger.LogWarning("Service map endpoint returned 404 - Service map may not be available via API or APM may not be enabled");
-                    // Try alternative endpoint: /api/v2/service_dependencies
-                    var altEndpoint = "/api/v2/service_dependencies";
-                    var altUrl = altEndpoint;
-                    if (queryParams.Any())
-                    {
-                        altUrl += "?" + string.Join("&", queryParams);
-                    }
-                    
-                    var altResponse = await _httpClient.GetAsync(altUrl, cancellationToken);
-                    if (altResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
-                    {
-                        return new ServiceMap
-                        {
-                            Nodes = new List<ServiceNode>(),
-                            Edges = new List<ServiceEdge>()
-                        };
-                    }
-                    
-                    altResponse.EnsureSuccessStatusCode();
-                    var altContent = await altResponse.Content.ReadAsStringAsync(cancellationToken);
-                    var altServiceMap = JsonSerializer.Deserialize<ServiceMap>(altContent,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                    return altServiceMap;
+                    _logger.LogWarning("Service dependencies endpoint returned 404 - APM may not be enabled");
+                    return new ServiceMap { Nodes = new List<ServiceNode>(), Edges = new List<ServiceEdge>() };
                 }
 
                 response.EnsureSuccessStatusCode();
 
                 var content = await response.Content.ReadAsStringAsync(cancellationToken);
-                var serviceMap = JsonSerializer.Deserialize<ServiceMap>(content,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                // Response format: { "service_a": { "calls": ["service_b", "service_c"] }, ... }
+                using var doc = JsonDocument.Parse(content);
+                var root = doc.RootElement;
+
+                var nodes = new Dictionary<string, ServiceNode>();
+                var edges = new List<ServiceEdge>();
+
+                if (root.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var serviceEntry in root.EnumerateObject())
+                    {
+                        var caller = serviceEntry.Name;
+
+                        if (!nodes.ContainsKey(caller))
+                            nodes[caller] = new ServiceNode { Service = caller, Type = "service" };
+
+                        if (serviceEntry.Value.TryGetProperty("calls", out var callsEl) && callsEl.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var callEl in callsEl.EnumerateArray())
+                            {
+                                var callee = callEl.GetString();
+                                if (string.IsNullOrEmpty(callee)) continue;
+
+                                if (!nodes.ContainsKey(callee))
+                                    nodes[callee] = new ServiceNode { Service = callee, Type = "service" };
+
+                                edges.Add(new ServiceEdge { From = caller, To = callee, Type = "calls" });
+                            }
+                        }
+                    }
+                }
+
+                var serviceMap = new ServiceMap
+                {
+                    Nodes = nodes.Values.ToList(),
+                    Edges = edges
+                };
+
+                // Filter to requested service and its direct neighbors if specified
+                if (!string.IsNullOrWhiteSpace(serviceName))
+                {
+                    var relevantServices = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { serviceName };
+                    foreach (var edge in edges.Where(e =>
+                        string.Equals(e.From, serviceName, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(e.To, serviceName, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        relevantServices.Add(edge.From!);
+                        relevantServices.Add(edge.To!);
+                    }
+
+                    serviceMap.Nodes = serviceMap.Nodes.Where(n => relevantServices.Contains(n.Service ?? "")).ToList();
+                    serviceMap.Edges = serviceMap.Edges.Where(e =>
+                        relevantServices.Contains(e.From ?? "") && relevantServices.Contains(e.To ?? "")).ToList();
+                }
 
                 return serviceMap;
             }
             catch (HttpRequestException httpEx) when (httpEx.Message.Contains("404"))
             {
-                _logger.LogWarning(httpEx, "Service map endpoint not found - may not be available via API");
-                return new ServiceMap
-                {
-                    Nodes = new List<ServiceNode>(),
-                    Edges = new List<ServiceEdge>()
-                };
+                _logger.LogWarning(httpEx, "Service dependencies endpoint not found - APM may not be enabled");
+                return new ServiceMap { Nodes = new List<ServiceNode>(), Edges = new List<ServiceEdge>() };
             }
             catch (Exception ex)
             {
@@ -904,40 +1055,70 @@ namespace DrSasuMcp.Datadog.Datadog
             {
                 ValidateAuthentication();
 
-                var endpoint = DatadogToolConstants.QueryEventsEndpoint;
-                var url = endpoint;
-                
-                var queryParams = new List<string>();
-                if (!string.IsNullOrWhiteSpace(query))
+                var requestBody = new
                 {
-                    queryParams.Add($"text={Uri.EscapeDataString(query)}");
-                }
-                if (from.HasValue)
-                {
-                    var fromUnix = ((DateTimeOffset)from.Value).ToUnixTimeSeconds();
-                    queryParams.Add($"start={fromUnix}");
-                }
-                if (to.HasValue)
-                {
-                    var toUnix = ((DateTimeOffset)to.Value).ToUnixTimeSeconds();
-                    queryParams.Add($"end={toUnix}");
-                }
-                if (limit.HasValue)
-                {
-                    queryParams.Add($"limit={limit.Value}");
-                }
+                    filter = new
+                    {
+                        query = query ?? "",
+                        from = (from ?? DateTime.UtcNow.AddHours(-1)).ToUniversalTime().ToString("O"),
+                        to = (to ?? DateTime.UtcNow).ToUniversalTime().ToString("O")
+                    },
+                    page = new { limit = limit ?? _maxResults },
+                    sort = "-timestamp"
+                };
 
-                if (queryParams.Any())
-                {
-                    url += "?" + string.Join("&", queryParams);
-                }
+                var json = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.GetAsync(url, cancellationToken);
+                var response = await _httpClient.PostAsync(DatadogToolConstants.QueryEventsEndpoint, content, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
-                var content = await response.Content.ReadAsStringAsync(cancellationToken);
-                var result = JsonSerializer.Deserialize<EventQueryResult>(content,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                using var doc = JsonDocument.Parse(responseContent);
+                var root = doc.RootElement;
+
+                var result = new EventQueryResult();
+                var events = new List<Event>();
+
+                if (root.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in dataElement.EnumerateArray())
+                    {
+                        var evt = new Event();
+
+                        if (item.TryGetProperty("attributes", out var attrsEl) && attrsEl.ValueKind == JsonValueKind.Object)
+                        {
+                            if (attrsEl.TryGetProperty("title", out var titleEl)) evt.Title = titleEl.GetString();
+                            if (attrsEl.TryGetProperty("message", out var msgEl)) evt.Text = msgEl.GetString();
+                            if (attrsEl.TryGetProperty("alert_type", out var atEl)) evt.AlertType = atEl.GetString();
+                            if (attrsEl.TryGetProperty("priority", out var priEl)) evt.Priority = priEl.GetString();
+
+                            if (attrsEl.TryGetProperty("timestamp", out var tsEl))
+                            {
+                                if (tsEl.ValueKind == JsonValueKind.String &&
+                                    DateTime.TryParse(tsEl.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+                                    evt.DateHappened = dt.ToUniversalTime();
+                                else if (tsEl.ValueKind == JsonValueKind.Number && tsEl.TryGetInt64(out var tsMs))
+                                    evt.DateHappened = DateTimeOffset.FromUnixTimeMilliseconds(tsMs).UtcDateTime;
+                            }
+
+                            if (attrsEl.TryGetProperty("tags", out var tagsEl) && tagsEl.ValueKind == JsonValueKind.Array)
+                                evt.Tags = tagsEl.EnumerateArray()
+                                    .Select(t => t.GetString())
+                                    .Where(t => t != null)
+                                    .Cast<string>()
+                                    .ToList();
+
+                            if (attrsEl.TryGetProperty("source_type_name", out var srcEl)) evt.Source = srcEl.GetString();
+                        }
+
+                        events.Add(evt);
+                    }
+                }
+
+                result.Events = events;
+                result.TotalCount = events.Count;
+                result.Status = "ok";
 
                 return result;
             }

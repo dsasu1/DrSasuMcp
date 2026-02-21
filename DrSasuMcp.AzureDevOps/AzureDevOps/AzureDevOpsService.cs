@@ -1,5 +1,6 @@
 using DrSasuMcp.AzureDevOps.AzureDevOps.Models;
 using Microsoft.Extensions.Logging;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -12,18 +13,29 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
     public class AzureDevOpsService : IAzureDevOpsService
     {
         private readonly HttpClient _httpClient;
+        private readonly IDiffService _diffService;
         private readonly ILogger<AzureDevOpsService> _logger;
         private readonly string? _personalAccessToken;
         private readonly int _maxFiles;
+        private readonly int _maxFileSizeBytes;
 
-        public AzureDevOpsService(ILogger<AzureDevOpsService> logger)
+        // Reuse a single options instance instead of allocating one per call
+        private static readonly JsonSerializerOptions JsonOptions =
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        public AzureDevOpsService(
+            IHttpClientFactory httpClientFactory,
+            IDiffService diffService,
+            ILogger<AzureDevOpsService> logger)
         {
             _logger = logger;
-            _httpClient = new HttpClient();
+            _diffService = diffService;
+            _httpClient = httpClientFactory.CreateClient(nameof(AzureDevOpsService));
 
             // Get configuration from environment variables
             _personalAccessToken = Environment.GetEnvironmentVariable(AzureDevOpsToolConstants.EnvAzureDevOpsPat);
             _maxFiles = GetIntFromEnv(AzureDevOpsToolConstants.EnvAzureDevOpsMaxFiles, AzureDevOpsToolConstants.DefaultMaxFiles);
+            _maxFileSizeBytes = GetIntFromEnv(AzureDevOpsToolConstants.EnvAzureDevOpsMaxFileSize, AzureDevOpsToolConstants.DefaultMaxFileSizeBytes);
 
             var timeoutSeconds = GetIntFromEnv(AzureDevOpsToolConstants.EnvAzureDevOpsTimeout, AzureDevOpsToolConstants.DefaultTimeoutSeconds);
             _httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
@@ -59,8 +71,7 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            var prResponse = JsonSerializer.Deserialize<AzurePullRequestResponse>(content,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var prResponse = JsonSerializer.Deserialize<AzurePullRequestResponse>(content, JsonOptions);
 
             if (prResponse == null)
                 throw new InvalidOperationException("Failed to deserialize pull request response");
@@ -95,53 +106,17 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
 
             ValidateAuthentication();
 
-            // First, get the latest iteration
-            var baseUrl = string.Format(AzureDevOpsToolConstants.BaseUrlTemplate, organization, project);
-            var iterationsEndpoint = string.Format(AzureDevOpsToolConstants.GetPullRequestIterationsEndpoint, repository, pullRequestId);
-            var iterationsUrl = $"{baseUrl}{iterationsEndpoint}?api-version={AzureDevOpsToolConstants.ApiVersion}";
-
-            var iterationsResponse = await _httpClient.GetAsync(iterationsUrl, cancellationToken);
-            iterationsResponse.EnsureSuccessStatusCode();
-
-            var iterationsContent = await iterationsResponse.Content.ReadAsStringAsync(cancellationToken);
-            var iterations = JsonSerializer.Deserialize<AzureIterationsResponse>(iterationsContent,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            if (iterations == null || iterations.value.Count == 0)
-                throw new InvalidOperationException("No iterations found for pull request");
-
-            // Get the latest iteration
-            var latestIteration = iterations.value.OrderByDescending(i => i.id).First();
-            var sourceCommitId = latestIteration.sourceRefCommit?.commitId ?? string.Empty;
-            var targetCommitId = latestIteration.targetRefCommit?.commitId ?? string.Empty;
-
-            // Get changes for the iteration
-            var changesEndpoint = string.Format(AzureDevOpsToolConstants.GetPullRequestChangesEndpoint,
-                repository, pullRequestId, latestIteration.id);
-            var changesUrl = $"{baseUrl}{changesEndpoint}?api-version={AzureDevOpsToolConstants.ApiVersion}";
-
-            var changesResponse = await _httpClient.GetAsync(changesUrl, cancellationToken);
-            changesResponse.EnsureSuccessStatusCode();
-
-            var changesContent = await changesResponse.Content.ReadAsStringAsync(cancellationToken);
-            var changes = JsonSerializer.Deserialize<AzureChangesResponse>(changesContent,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            if (changes == null)
-                return new List<FileChange>();
+            var (sourceCommitId, targetCommitId, rawChanges) =
+                await FetchIterationChangesAsync(organization, project, repository, pullRequestId, cancellationToken);
 
             var fileChanges = new List<FileChange>();
 
-            foreach (var change in changes.changeEntries.Take(_maxFiles))
+            // Filter folders first, then apply the file limit so we always get up to _maxFiles actual files
+            foreach (var change in rawChanges.Where(c => c.item?.isFolder != true).Take(_maxFiles))
             {
-                // Skip folders
-                if (change.item?.isFolder == true)
-                    continue;
-
                 var changeType = MapChangeType(change.changeType);
                 var filePath = change.item?.path ?? string.Empty;
 
-                // Skip if path is empty
                 if (string.IsNullOrWhiteSpace(filePath))
                     continue;
 
@@ -160,7 +135,7 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
                     {
                         fileChange.OriginalContent = await GetFileContentAsync(
                             organization, project, repository, filePath, targetCommitId, cancellationToken);
-                        _logger.LogDebug("Fetched original content for {FilePath}: {Length} chars", 
+                        _logger.LogDebug("Fetched original content for {FilePath}: {Length} chars",
                             filePath, fileChange.OriginalContent?.Length ?? 0);
                     }
 
@@ -168,18 +143,17 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
                     {
                         fileChange.ModifiedContent = await GetFileContentAsync(
                             organization, project, repository, filePath, sourceCommitId, cancellationToken);
-                        _logger.LogDebug("Fetched modified content for {FilePath}: {Length} chars", 
+                        _logger.LogDebug("Fetched modified content for {FilePath}: {Length} chars",
                             filePath, fileChange.ModifiedContent?.Length ?? 0);
                     }
 
-                    // Calculate additions/deletions
+                    // Use DiffService for accurate addition/deletion counts
                     CalculateLineChanges(fileChange);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to fetch content for file {FilePath}. Error: {Error}", 
+                    _logger.LogWarning(ex, "Failed to fetch content for file {FilePath}. Error: {Error}",
                         filePath, ex.Message);
-                    // Continue with other files but mark content as unavailable
                     fileChange.OriginalContent = null;
                     fileChange.ModifiedContent = null;
                 }
@@ -189,6 +163,25 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
 
             _logger.LogInformation("Retrieved {Count} file changes", fileChanges.Count);
             return fileChanges;
+        }
+
+        /// <inheritdoc/>
+        public async Task<int> GetPullRequestChangesCountAsync(
+            string organization,
+            string project,
+            string repository,
+            int pullRequestId,
+            CancellationToken cancellationToken = default)
+        {
+            _logger.LogInformation("Fetching change count for PR {PullRequestId}", pullRequestId);
+
+            ValidateAuthentication();
+
+            var (_, _, rawChanges) =
+                await FetchIterationChangesAsync(organization, project, repository, pullRequestId, cancellationToken);
+
+            // Count only non-folder entries; no _maxFiles limit since we want the true total
+            return rawChanges.Count(c => c.item?.isFolder != true && !string.IsNullOrWhiteSpace(c.item?.path));
         }
 
         /// <inheritdoc/>
@@ -209,7 +202,7 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             _logger.LogDebug("Fetching file content from: {Url}", url);
 
             var response = await _httpClient.GetAsync(url, cancellationToken);
-            
+
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 _logger.LogWarning("File not found: {Path} at commit {CommitId}", path, commitId);
@@ -219,14 +212,20 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("Failed to fetch file content. Status: {Status}, Response: {Response}", 
+                _logger.LogError("Failed to fetch file content. Status: {Status}, Response: {Response}",
                     response.StatusCode, errorContent);
                 throw new HttpRequestException($"Failed to fetch file content: {response.StatusCode} - {errorContent}");
             }
 
-            response.EnsureSuccessStatusCode();
             var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            
+
+            // Guard against very large files
+            if (Encoding.UTF8.GetByteCount(responseContent) > _maxFileSizeBytes)
+            {
+                _logger.LogWarning("File {Path} exceeds max size limit ({MaxBytes} bytes), skipping content", path, _maxFileSizeBytes);
+                return string.Empty;
+            }
+
             // Parse JSON response to extract content field
             try
             {
@@ -270,6 +269,50 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             }
         }
 
+        /// <summary>
+        /// Shared helper: fetches the latest iteration and its raw change entries for a PR.
+        /// </summary>
+        private async Task<(string sourceCommitId, string targetCommitId, List<AzureChange> changes)>
+            FetchIterationChangesAsync(
+                string organization,
+                string project,
+                string repository,
+                int pullRequestId,
+                CancellationToken cancellationToken)
+        {
+            var baseUrl = string.Format(AzureDevOpsToolConstants.BaseUrlTemplate, organization, project);
+
+            // Get iterations
+            var iterationsEndpoint = string.Format(AzureDevOpsToolConstants.GetPullRequestIterationsEndpoint, repository, pullRequestId);
+            var iterationsUrl = $"{baseUrl}{iterationsEndpoint}?api-version={AzureDevOpsToolConstants.ApiVersion}";
+
+            var iterationsResponse = await _httpClient.GetAsync(iterationsUrl, cancellationToken);
+            iterationsResponse.EnsureSuccessStatusCode();
+
+            var iterationsContent = await iterationsResponse.Content.ReadAsStringAsync(cancellationToken);
+            var iterations = JsonSerializer.Deserialize<AzureIterationsResponse>(iterationsContent, JsonOptions);
+
+            if (iterations == null || iterations.value.Count == 0)
+                throw new InvalidOperationException("No iterations found for pull request");
+
+            var latestIteration = iterations.value.OrderByDescending(i => i.id).First();
+            var sourceCommitId = latestIteration.sourceRefCommit?.commitId ?? string.Empty;
+            var targetCommitId = latestIteration.targetRefCommit?.commitId ?? string.Empty;
+
+            // Get changes for the latest iteration
+            var changesEndpoint = string.Format(AzureDevOpsToolConstants.GetPullRequestChangesEndpoint,
+                repository, pullRequestId, latestIteration.id);
+            var changesUrl = $"{baseUrl}{changesEndpoint}?api-version={AzureDevOpsToolConstants.ApiVersion}";
+
+            var changesResponse = await _httpClient.GetAsync(changesUrl, cancellationToken);
+            changesResponse.EnsureSuccessStatusCode();
+
+            var changesContent = await changesResponse.Content.ReadAsStringAsync(cancellationToken);
+            var changes = JsonSerializer.Deserialize<AzureChangesResponse>(changesContent, JsonOptions);
+
+            return (sourceCommitId, targetCommitId, changes?.changeEntries ?? new List<AzureChange>());
+        }
+
         private void ValidateAuthentication()
         {
             if (string.IsNullOrWhiteSpace(_personalAccessToken))
@@ -291,37 +334,25 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             };
         }
 
-        private static void CalculateLineChanges(FileChange fileChange)
+        private void CalculateLineChanges(FileChange fileChange)
         {
             if (fileChange.ChangeType == ChangeType.Added)
             {
-                fileChange.Additions = fileChange.ModifiedContent?.Split('\n').Length ?? 0;
+                var stats = _diffService.CalculateStatistics(null, fileChange.ModifiedContent);
+                fileChange.Additions = stats.AddedLines + stats.UnchangedLines;
                 fileChange.Deletions = 0;
             }
             else if (fileChange.ChangeType == ChangeType.Deleted)
             {
+                var stats = _diffService.CalculateStatistics(fileChange.OriginalContent, null);
                 fileChange.Additions = 0;
-                fileChange.Deletions = fileChange.OriginalContent?.Split('\n').Length ?? 0;
+                fileChange.Deletions = stats.DeletedLines + stats.UnchangedLines;
             }
             else
             {
-                var oldLines = fileChange.OriginalContent?.Split('\n') ?? Array.Empty<string>();
-                var newLines = fileChange.ModifiedContent?.Split('\n') ?? Array.Empty<string>();
-
-                // Simple line counting (will be refined by DiffService)
-                var oldCount = oldLines.Length;
-                var newCount = newLines.Length;
-
-                if (newCount > oldCount)
-                {
-                    fileChange.Additions = newCount - oldCount;
-                    fileChange.Deletions = 0;
-                }
-                else
-                {
-                    fileChange.Additions = 0;
-                    fileChange.Deletions = oldCount - newCount;
-                }
+                var stats = _diffService.CalculateStatistics(fileChange.OriginalContent, fileChange.ModifiedContent);
+                fileChange.Additions = stats.AddedLines + stats.ModifiedLines;
+                fileChange.Deletions = stats.DeletedLines + stats.ModifiedLines;
             }
         }
 
@@ -389,4 +420,3 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         #endregion
     }
 }
-
