@@ -329,8 +329,10 @@ public partial class DockerTool
         [Description("Image name to use for the container")] string image,
         [Description("Container name")] string? name = null,
         [Description("Command to run in the container")] string? command = null,
-        [Description("Environment variables as JSON object")] string? env = null,
-        [Description("Port mappings as JSON object (e.g., {\"80\":\"8080\"})")] string? ports = null)
+        [Description("Environment variables in KEY=value format, e.g. [\"POSTGRES_PASSWORD=secret\", \"POSTGRES_DB=mydb\"]")] List<string>? environment = null,
+        [Description("Port mappings as containerPort:hostPort, e.g. {\"5432\":\"5432\", \"80\":\"8080\"}")] Dictionary<string, string>? ports = null,
+        [Description("Volume binds, e.g. [\"myvolume:/data\", \"/host/path:/container/path\"]")] List<string>? volumes = null,
+        [Description("Restart policy: no, always, unless-stopped, on-failure")] string? restartPolicy = null)
     {
         try
         {
@@ -343,32 +345,55 @@ public partial class DockerTool
                 Cmd = !string.IsNullOrEmpty(command) ? command.Split(' ') : null
             };
 
-            if (!string.IsNullOrEmpty(env))
+            if (environment is { Count: > 0 })
             {
-                var envDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(env);
-                if (envDict != null)
+                createParams.Env = environment;
+            }
+
+            var hostConfig = new HostConfig();
+            var hasHostConfig = false;
+
+            if (ports is { Count: > 0 })
+            {
+                hasHostConfig = true;
+                createParams.ExposedPorts = new Dictionary<string, EmptyStruct>();
+                hostConfig.PortBindings = new Dictionary<string, IList<PortBinding>>();
+
+                foreach (var kvp in ports)
                 {
-                    createParams.Env = envDict.Select(kvp => $"{kvp.Key}={kvp.Value}").ToList();
+                    var containerPort = kvp.Key.Contains('/') ? kvp.Key : $"{kvp.Key}/tcp";
+                    createParams.ExposedPorts[containerPort] = default;
+                    hostConfig.PortBindings[containerPort] = new List<PortBinding>
+                    {
+                        new PortBinding { HostPort = kvp.Value }
+                    };
                 }
             }
 
-            if (!string.IsNullOrEmpty(ports))
+            if (volumes is { Count: > 0 })
             {
-                var portDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(ports);
-                if (portDict != null)
+                hasHostConfig = true;
+                hostConfig.Binds = volumes;
+            }
+
+            if (!string.IsNullOrEmpty(restartPolicy))
+            {
+                hasHostConfig = true;
+                hostConfig.RestartPolicy = new RestartPolicy
                 {
-                    createParams.HostConfig = new HostConfig
+                    Name = restartPolicy switch
                     {
-                        PortBindings = new Dictionary<string, IList<PortBinding>>()
-                    };
-                    foreach (var kvp in portDict)
-                    {
-                        createParams.HostConfig.PortBindings[$"{kvp.Key}/tcp"] = new List<PortBinding>
-                        {
-                            new PortBinding { HostPort = kvp.Value }
-                        };
+                        "always" => RestartPolicyKind.Always,
+                        "unless-stopped" => RestartPolicyKind.UnlessStopped,
+                        "on-failure" => RestartPolicyKind.OnFailure,
+                        _ => RestartPolicyKind.No
                     }
-                }
+                };
+            }
+
+            if (hasHostConfig)
+            {
+                createParams.HostConfig = hostConfig;
             }
 
             var response = await client.Containers.CreateContainerAsync(createParams);
