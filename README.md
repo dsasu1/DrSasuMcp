@@ -8,7 +8,7 @@
 
 ## 🌟 Overview
 
-DrSasuMcp brings **SQL Server and MongoDB database management**, **HTTP API testing**, **Azure DevOps PR review**, **Datadog monitoring & troubleshooting**, and **Docker container management** directly into your AI assistant conversations. Each capability is a standalone MCP server that can be deployed independently or together. Execute queries, manage schemas, test APIs, review pull requests, troubleshoot issues, monitor systems, and manage containers—all through natural language commands.
+DrSasuMcp brings **SQL Server, PostgreSQL, and MongoDB database management**, **HTTP API testing**, **Azure DevOps PR review**, **Datadog monitoring & troubleshooting**, and **Docker container management** directly into your AI assistant conversations. Each capability is a standalone MCP server that can be deployed independently or together. Execute queries, manage schemas, test APIs, review pull requests, troubleshoot issues, monitor systems, and manage containers—all through natural language commands.
 
 ### Why DrSasuMcp?
 
@@ -31,12 +31,13 @@ Pre-built executables are available for quick setup. Download the tools you need
 
 | Tool | Download | Published |
 |------|----------|-----------|
-| SQL Server Tool | [sql.zip](https://docsas.blob.core.windows.net/downloads/mcp/sql.zip) | January 25, 2026 |
-| MongoDB Tool | [mongo.zip](https://docsas.blob.core.windows.net/downloads/mcp/mongo.zip) | January 25, 2026 |
-| API Testing Tool | [api.zip](https://docsas.blob.core.windows.net/downloads/mcp/api.zip) | January 25, 2026 |
-| Azure DevOps Tool | [azuredevops.zip](https://docsas.blob.core.windows.net/downloads/mcp/azuredevops.zip) | January 25, 2026 |
-| Datadog Tool | [datadog.zip](https://docsas.blob.core.windows.net/downloads/mcp/datadog.zip) | January 25, 2026 |
-| Docker Tool | [docker.zip](https://docsas.blob.core.windows.net/downloads/mcp/docker.zip) | January 25, 2026 |
+| SQL Server Tool | [sql.zip](https://docsas.blob.core.windows.net/downloads/mcp/sql.zip) | April 25, 2026 |
+| PostgreSQL Tool | [postgres.zip](https://docsas.blob.core.windows.net/downloads/mcp/postgres.zip) | April 25, 2026 |
+| MongoDB Tool | [mongo.zip](https://docsas.blob.core.windows.net/downloads/mcp/mongo.zip) | April 25, 2026 |
+| API Testing Tool | [api.zip](https://docsas.blob.core.windows.net/downloads/mcp/api.zip) | April 25, 2026 |
+| Azure DevOps Tool | [azuredevops.zip](https://docsas.blob.core.windows.net/downloads/mcp/azuredevops.zip) | April 25, 2026 |
+| Datadog Tool | [datadog.zip](https://docsas.blob.core.windows.net/downloads/mcp/datadog.zip) | April 25, 2026 |
+| Docker Tool | [docker.zip](https://docsas.blob.core.windows.net/downloads/mcp/docker.zip) | April 25, 2026 |
 
 > **Note:** Extract the zip file and configure the executable path in your MCP client configuration. See [Configuration](#configuration) for details.
 
@@ -78,6 +79,7 @@ DrSasuMcp uses a **modular multi-project architecture** where each tool is a com
 Each of these is a standalone MCP server:
 
 - **DrSasuMcp.SQL** - SQL Server database management
+- **DrSasuMcp.PostgreSQL** - PostgreSQL database management
 - **DrSasuMcp.MongoDB** - MongoDB database management
 - **DrSasuMcp.API** - HTTP API testing
 - **DrSasuMcp.AzureDevOps** - Pull request reviews
@@ -90,12 +92,17 @@ Mix and match based on your needs!
 
 ## 📦 Available Tools
 
-DrSasuMcp provides six standalone MCP servers, each focused on a specific capability:
+DrSasuMcp provides seven standalone MCP servers, each focused on a specific capability:
 
 ### 🗄️ SQL Database Tool
 Complete SQL Server management—explore schemas, execute queries, and manage data with comprehensive safety features.
 
 **[📖 Full Documentation](DrSasuMcp.SQL/README.md)**
+
+### 🐘 PostgreSQL Database Tool
+PostgreSQL operations with schema exploration, CRUD, and DDL—parity with the SQL Server tool for consistent AI workflows.
+
+**[📖 Full Documentation](DrSasuMcp.PostgreSQL/README.md)**
 
 ### 🍃 MongoDB Database Tool
 MongoDB operations with schema inference, CRUD operations, and collection management.
@@ -163,6 +170,14 @@ Each tool is a separate MCP server. Configure only the ones you need in your Cla
       "env": {
         "SQL_CONNECTION_STRING": "Server=.;Database=YourDatabase;Trusted_Connection=True;TrustServerCertificate=True"
       }
+    },
+    "drsasumcp-postgres": {
+      "type": "stdio",
+      "command": "dotnet",
+      "args": ["run", "--project", "C:\\Projects\\personal\\DrSasuMcp\\DrSasuMcp.PostgreSQL\\DrSasuMcp.PostgreSQL.csproj"],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "Host=localhost;Database=mydb;Username=postgres;Password=yourpassword"
+      }
     }
   }
 }
@@ -173,6 +188,7 @@ Each tool is a separate MCP server. Configure only the ones you need in your Cla
 ```bash
 # Publish the tools you need
 dotnet publish DrSasuMcp.SQL/DrSasuMcp.SQL.csproj -c Release -o ./publish/sql
+dotnet publish DrSasuMcp.PostgreSQL/DrSasuMcp.PostgreSQL.csproj -c Release -o ./publish/postgres
 dotnet publish DrSasuMcp.Docker/DrSasuMcp.Docker.csproj -c Release -o ./publish/docker
 ```
 
@@ -183,6 +199,12 @@ dotnet publish DrSasuMcp.Docker/DrSasuMcp.Docker.csproj -c Release -o ./publish/
       "command": "C:\\Projects\\personal\\DrSasuMcp\\publish\\sql\\DrSasuMcp.SQL.exe",
       "env": {
         "SQL_CONNECTION_STRING": "Server=.;Database=YourDatabase;Trusted_Connection=True;TrustServerCertificate=True"
+      }
+    },
+    "drsasumcp-postgres": {
+      "command": "C:\\Projects\\personal\\DrSasuMcp\\publish\\postgres\\DrSasuMcp.PostgreSQL.exe",
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "Host=localhost;Database=mydb;Username=postgres;Password=yourpassword"
       }
     },
     "drsasumcp-docker": {
@@ -202,6 +224,11 @@ Each tool can be run independently for testing:
 # SQL Tool
 cd DrSasuMcp.SQL
 set SQL_CONNECTION_STRING="Server=.;Database=test;Trusted_Connection=True;TrustServerCertificate=True"
+dotnet run
+
+# PostgreSQL Tool
+cd DrSasuMcp.PostgreSQL
+set POSTGRES_CONNECTION_STRING="Host=localhost;Database=test;Username=postgres;Password=yourpassword"
 dotnet run
 
 # MongoDB Tool  
@@ -231,6 +258,13 @@ Once configured, you can interact with the tools through natural language:
 "Show me all tables in my database"
 "Describe the Users table"
 "Get all users who registered in the last 30 days"
+```
+
+**PostgreSQL Operations:**
+```
+"List all tables in my Postgres database"
+"Describe the public.users table"
+"Run SELECT * FROM orders WHERE status = 'pending'"
 ```
 
 **MongoDB Operations:**
@@ -292,6 +326,15 @@ DrSasuMcp/
 │       ├── SQLToolConstant.cs
 │       ├── ISqlConnectionFactory.cs
 │       └── SqlConnectionFactory.cs
+├── DrSasuMcp.PostgreSQL/                # PostgreSQL MCP Server
+│   ├── Program.cs
+│   ├── DrSasuMcp.PostgreSQL.csproj
+│   ├── README.md
+│   └── PostgreSQL/
+│       ├── PostgreSQLTool.cs
+│       ├── PostgreSQLToolQueries.cs
+│       ├── IPostgreSqlConnectionFactory.cs
+│       └── PostgreSqlConnectionFactory.cs
 ├── DrSasuMcp.MongoDB/                   # MongoDB MCP Server
 │   ├── Program.cs                       # MongoDB server entry point
 │   ├── DrSasuMcp.MongoDB.csproj
@@ -348,6 +391,7 @@ DrSasuMcp/
 └── Tests/                               # Test projects
     ├── DrSasuMcp.Tests/                 # Common tests
     ├── DrSasuMcp.Tests.SQL/             # SQL tool tests
+    ├── DrSasuMcp.Tests.PostgreSQL/      # PostgreSQL tool tests
     ├── DrSasuMcp.Tests.MongoDB/         # MongoDB tool tests
     ├── DrSasuMcp.Tests.API/             # API tool tests
     ├── DrSasuMcp.Tests.AzureDevOps/     # Azure DevOps tool tests
@@ -388,6 +432,7 @@ dotnet test DrSasuMcp.sln
 
 # Publish for deployment
 dotnet publish DrSasuMcp.SQL/DrSasuMcp.SQL.csproj -c Release -o ./publish/sql
+dotnet publish DrSasuMcp.PostgreSQL/DrSasuMcp.PostgreSQL.csproj -c Release -o ./publish/postgres
 ```
 
 ### Adding New Tools
@@ -421,6 +466,7 @@ Create your tool class with `[McpServerTool]` attributes and configure hosting i
 Each tool has comprehensive documentation with setup guides, API references, and examples:
 
 - **[SQL Tool →](DrSasuMcp.SQL/README.md)** - SQL Server operations
+- **[PostgreSQL Tool →](DrSasuMcp.PostgreSQL/README.md)** - PostgreSQL operations
 - **[MongoDB Tool →](DrSasuMcp.MongoDB/README.md)** - MongoDB operations  
 - **[API Tool →](DrSasuMcp.API/README.md)** - HTTP API testing
 - **[Azure DevOps Tool →](DrSasuMcp.AzureDevOps/README.md)** - PR reviews
@@ -458,9 +504,9 @@ Each tool implements security best practices:
 - [x] Datadog Monitoring & Troubleshooting Tool
 - [x] Advanced troubleshooting with root cause analysis
 - [x] Intelligent fix recommendations with impact/effort estimates
+- [x] PostgreSQL Database Tool with schema exploration and CRUD operations
 
 ### Planned Features
-- [ ] PostgreSQL Database Tool
 - [ ] MySQL Database Tool
 - [ ] SQLite Database Tool
 - [ ] AI-powered intelligent PR review comments
