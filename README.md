@@ -1,8 +1,8 @@
 # DrSasuMcp 🚀
 
-**DrSasuMcp** is a collection of powerful [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers that extend AI assistants with database management, API testing, code review, and monitoring capabilities. Built with .NET 8, each tool is a standalone MCP server providing seamless integration between AI-powered workflows and enterprise systems.
+**DrSasuMcp** is a collection of powerful [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers that extend AI assistants with database management, API testing, code review, and monitoring capabilities. Built with .NET 10, each tool is a standalone MCP server providing seamless integration between AI-powered workflows and enterprise systems.
 
-[![.NET Version](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
+[![.NET Version](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![MCP Protocol](https://img.shields.io/badge/MCP-v0.4.0-green.svg)](https://modelcontextprotocol.io/)
 
@@ -135,7 +135,7 @@ Docker container, image, network, and volume management through natural language
 
 ### Prerequisites
 
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or later
 - MCP-compatible AI assistant (Claude Desktop, VS Code with MCP, etc.)
 - Specific prerequisites for each tool (SQL Server, MongoDB, etc.) - see individual tool documentation
 
@@ -548,14 +548,14 @@ Contributions are welcome! Please follow these guidelines:
 
 ## 📋 Requirements
 
-- **.NET 8.0 SDK** or later
+- **.NET 10.0 SDK** or later
 - **MCP-compatible AI assistant** (Claude Desktop, VS Code with MCP, etc.)
 - **Per-tool requirements**: See individual tool documentation
 
 ### Project Dependencies
 
 - `ModelContextProtocol` (^0.4.0-preview.3) - MCP server framework
-- `Microsoft.Extensions.Hosting` (^8.0.1) - Hosting and DI
+- `Microsoft.Extensions.Hosting` (^10.0.11) - Hosting and DI
 - Tool-specific packages (SQL Client, MongoDB Driver, etc.)
 
 > 📖 **For detailed requirements**, see each tool's documentation.

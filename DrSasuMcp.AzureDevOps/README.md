@@ -441,7 +441,7 @@ AI calls GetPullRequestInfo
 ## Dependencies
 
 - **DiffPlex 1.9.0** - Diff generation
-- **Microsoft.Extensions.Http 8.0.1** - `IHttpClientFactory` for managed HTTP client lifetime
+- **Microsoft.Extensions.Http 10.0.11** - `IHttpClientFactory` for managed HTTP client lifetime
 - **System.Text.Json** - JSON parsing
 - **ModelContextProtocol** - MCP server integration
 

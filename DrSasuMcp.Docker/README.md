@@ -471,7 +471,7 @@ Solution: Check Docker permissions
 ## Dependencies
 
 - `Docker.DotNet` (^3.125.15) - Docker .NET client library
-- `Microsoft.Extensions.Hosting` (^8.0.1) - Hosting framework
+- `Microsoft.Extensions.Hosting` (^10.0.11) - Hosting framework
 - `ModelContextProtocol` (^0.4.0-preview.3) - MCP server framework
 
 ---
