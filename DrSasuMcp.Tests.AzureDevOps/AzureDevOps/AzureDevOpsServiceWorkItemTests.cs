@@ -534,13 +534,18 @@ namespace DrSasuMcp.Tests.AzureDevOps
         }
 
         [Fact]
-        public void GetMaxWorkItems_NoOverride_ReturnsDefault()
+        public async Task QueryWorkItemsAsync_ConfiguredMaximumBelowOne_StillReturnsOneResult()
         {
             // Arrange
-            var service = CreateService(new StubHttpMessageHandler());
+            var handler = new StubHttpMessageHandler()
+                .RespondTo("/wit/wiql", """{ "queryType": "flat", "workItems": [] }""");
+            var service = CreateService(handler, maxWorkItems: 0);
 
-            // Act & Assert
-            Assert.Equal(AzureDevOpsToolConstants.DefaultMaxWorkItems, service.GetMaxWorkItems());
+            // Act
+            await service.QueryWorkItemsAsync("contoso", "Contoso", "SELECT [System.Id] FROM WorkItems", top: 10);
+
+            // Assert
+            Assert.Contains("$top=2", handler.Requests[0].Url);
         }
 
         private static int CountRequestedIds(string url)

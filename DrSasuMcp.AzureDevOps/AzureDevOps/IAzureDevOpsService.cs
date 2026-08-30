@@ -154,12 +154,6 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         /// </summary>
         /// <returns>The default organization name, or null when it is not configured.</returns>
         string? GetDefaultOrganization();
-
-        /// <summary>
-        /// Gets the maximum number of work items a single query may return.
-        /// </summary>
-        /// <returns>The configured work item limit.</returns>
-        int GetMaxWorkItems();
     }
 }
 

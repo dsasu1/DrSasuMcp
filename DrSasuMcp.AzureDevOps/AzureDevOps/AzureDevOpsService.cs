@@ -42,7 +42,8 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             _defaultOrganization = Environment.GetEnvironmentVariable(AzureDevOpsToolConstants.EnvAzureDevOpsOrg);
             _maxFiles = GetIntFromEnv(AzureDevOpsToolConstants.EnvAzureDevOpsMaxFiles, AzureDevOpsToolConstants.DefaultMaxFiles);
             _maxFileSizeBytes = GetIntFromEnv(AzureDevOpsToolConstants.EnvAzureDevOpsMaxFileSize, AzureDevOpsToolConstants.DefaultMaxFileSizeBytes);
-            _maxWorkItems = GetIntFromEnv(AzureDevOpsToolConstants.EnvAzureDevOpsMaxWorkItems, AzureDevOpsToolConstants.DefaultMaxWorkItems);
+            // A configured limit below one would leave every query unable to return results
+            _maxWorkItems = Math.Max(1, GetIntFromEnv(AzureDevOpsToolConstants.EnvAzureDevOpsMaxWorkItems, AzureDevOpsToolConstants.DefaultMaxWorkItems));
 
             var timeoutSeconds = GetIntFromEnv(AzureDevOpsToolConstants.EnvAzureDevOpsTimeout, AzureDevOpsToolConstants.DefaultTimeoutSeconds);
             _httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
@@ -416,9 +417,6 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         /// <inheritdoc/>
         public string? GetDefaultOrganization() =>
             string.IsNullOrWhiteSpace(_defaultOrganization) ? null : _defaultOrganization;
-
-        /// <inheritdoc/>
-        public int GetMaxWorkItems() => _maxWorkItems;
 
         /// <inheritdoc/>
         public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default)
