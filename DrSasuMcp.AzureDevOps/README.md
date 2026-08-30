@@ -2,7 +2,7 @@
 
 # Azure DevOps PR Review Tool for DrSasuMcp
 
-A comprehensive Model Context Protocol (MCP) server tool for analyzing Azure DevOps Pull Requests with automated code review, security analysis, and best practice validation.
+A comprehensive Model Context Protocol (MCP) server tool for analyzing Azure DevOps Pull Requests with automated code review, security analysis, and best practice validation, plus read-only access to work items.
 
 ## Overview
 
@@ -12,6 +12,11 @@ This tool allows AI assistants to fetch, analyze, and review Azure DevOps Pull R
 - Running multiple code analyzers (Security, Quality, Best Practices)
 - Providing actionable review comments with severity levels
 
+It also gives AI assistants read-only access to work items by:
+- Fetching a single work item by ID or URL, optionally with its links
+- Querying work items with WIQL
+- Listing the work items linked to a pull request
+
 ## Features
 
 ### 🔍 Pull Request Analysis
@@ -19,6 +24,15 @@ This tool allows AI assistants to fetch, analyze, and review Azure DevOps Pull R
 - **File Changes** - All modified, added, and deleted files
 - **Line-by-Line Diffs** - Unified, side-by-side, and inline formats
 - **Change Statistics** - Additions, deletions, change percentages
+
+### 📋 Work Item Access
+- **Work Item Details** - Type, title, state, reason, assignee, area and iteration paths, tags, dates
+- **Estimates** - Priority, severity, story points, effort, remaining and completed work
+- **Rich Text Fields** - Description, acceptance criteria, repro steps (HTML as stored by Azure DevOps)
+- **Links** - Parent, child, related work items, and attached artifacts such as pull requests
+- **Custom Fields** - Any extra field reference names requested by the caller
+- **WIQL Queries** - Flat, tree, and one-hop queries with a configurable result limit
+- **PR Traceability** - The work items linked to a pull request
 
 ### 🛡️ Security Analysis
 - Hardcoded credentials detection (passwords, API keys, tokens)
@@ -147,6 +161,102 @@ Tests Azure DevOps connection and PAT authentication.
 
 **Returns:** Connection status and authentication validation
 
+### 5. `AzureGetWorkItem`
+Retrieves a single work item by ID or URL.
+
+**Parameters:**
+- `workItem` (required): Work item ID (e.g. `1234`) or full work item URL
+- `project` (optional): Project name. Needed when passing a bare ID for a project-scoped work item
+- `organization` (optional): Organization name. Defaults to `AZURE_DEVOPS_ORG`
+- `includeRelations` (optional): Include parent, child, related, and artifact links (default: false)
+- `additionalFields` (optional): Comma-separated field reference names to include beyond the standard set
+
+**Returns:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1234,
+    "revision": 7,
+    "workItemType": "User Story",
+    "title": "Support work item lookups",
+    "state": "Active",
+    "reason": "Implementation started",
+    "assignedTo": "Ada Lovelace",
+    "createdBy": "Grace Hopper",
+    "createdDate": "2026-02-03T09:15:22.13Z",
+    "changedBy": "Ada Lovelace",
+    "changedDate": "2026-02-10T11:00:00Z",
+    "areaPath": "Contoso\\Web",
+    "iterationPath": "Contoso\\Sprint 12",
+    "projectName": "Contoso",
+    "organization": "contoso",
+    "tags": ["mcp", "azure-devops"],
+    "priority": 2,
+    "description": "<div>Expose work items through MCP</div>",
+    "storyPoints": 5.5,
+    "parentId": 1200,
+    "url": "https://dev.azure.com/contoso/Contoso/_workitems/edit/1234",
+    "relations": [
+      {
+        "relationType": "System.LinkTypes.Hierarchy-Reverse",
+        "name": "Parent",
+        "url": "https://dev.azure.com/contoso/_apis/wit/workItems/1200",
+        "targetWorkItemId": 1200
+      }
+    ],
+    "additionalFields": { "Custom.Team": "Platform" }
+  }
+}
+```
+
+**Example Usage:**
+```
+AI Assistant: "What is the status of work item 1234?"
+
+Calls: AzureGetWorkItem(workItem: "1234", project: "Contoso")
+```
+
+### 6. `AzureQueryWorkItems`
+Runs a WIQL query and returns details for the matching work items.
+
+**Parameters:**
+- `wiql` (required): WIQL `SELECT` query. Non-`SELECT` queries are rejected
+- `project` (optional): Project to scope the query to. Required for queries using project-scoped macros such as `@project`
+- `organization` (optional): Organization name. Defaults to `AZURE_DEVOPS_ORG`
+- `top` (optional): Maximum work items to return (default: 50, capped by `AZURE_DEVOPS_MAX_WORK_ITEMS`)
+- `additionalFields` (optional): Comma-separated field reference names to include beyond the standard set
+
+**Returns:** `queryType`, `asOf`, `matchedCount`, `truncated`, and the hydrated `workItems`
+
+**Example Usage:**
+```
+AI: "Show me the active bugs assigned to me"
+
+Calls: AzureQueryWorkItems(
+  wiql: "SELECT [System.Id] FROM WorkItems WHERE [System.WorkItemType] = 'Bug' AND [System.State] = 'Active' AND [System.AssignedTo] = @me ORDER BY [System.ChangedDate] DESC",
+  project: "Contoso"
+)
+```
+
+### 7. `AzureGetPullRequestWorkItems`
+Lists the work items linked to a pull request.
+
+**Parameters:**
+- `prUrl` (required): Full Azure DevOps PR URL
+- `additionalFields` (optional): Comma-separated field reference names to include beyond the standard set
+
+**Returns:** Pull request identity plus `linkedCount` and the linked `workItems`
+
+**Example Usage:**
+```
+AI: "Which work items does PR 123 close?"
+
+Calls: AzureGetPullRequestWorkItems(
+  prUrl: "https://dev.azure.com/org/project/_git/repo/pullrequest/123"
+)
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -158,8 +268,10 @@ AZURE_DEVOPS_PAT=your_personal_access_token
 
 #### Optional
 ```bash
+AZURE_DEVOPS_ORG=your_organization          # Default organization for work item tools when no URL is supplied
 AZURE_DEVOPS_MAX_FILES=100                  # Max files to analyze per PR (default: 100)
 AZURE_DEVOPS_MAX_FILE_SIZE=1048576          # Max file size in bytes to fetch (default: 1MB). Files exceeding this are skipped.
+AZURE_DEVOPS_MAX_WORK_ITEMS=100             # Max work items returned by a WIQL query (default: 100)
 AZURE_DEVOPS_TIMEOUT=60                     # Request timeout in seconds (default: 60)
 ```
 
@@ -170,6 +282,7 @@ AZURE_DEVOPS_TIMEOUT=60                     # Request timeout in seconds (defaul
 3. Set scopes:
    - ✅ **Code** (Read)
    - ✅ **Pull Request Threads** (Read)
+   - ✅ **Work Items** (Read) - required for the work item tools
 4. Copy the token
 5. Set environment variable:
    ```bash
@@ -262,6 +375,22 @@ https://dev.azure.com/{organization}/{project}/_git/{repository}/pullrequest/{id
 - `https://dev.azure.com/microsoft/vscode/_git/vscode/pullrequest/12345`
 - `https://dev.azure.com/mycompany/MyProject/_git/MainRepo/pullrequest/42`
 
+## Supported Work Item Reference Formats
+
+Work item tools accept a bare ID or any of these URL forms:
+
+```
+1234
+#1234
+https://dev.azure.com/{organization}/{project}/_workitems/edit/{id}
+https://dev.azure.com/{organization}/_workitems/edit/{id}
+https://dev.azure.com/{organization}/{project}/_workitems?id={id}
+https://{organization}.visualstudio.com/{project}/_workitems/edit/{id}
+```
+
+When a URL is supplied, the organization and project it contains take precedence over the
+`organization` and `project` parameters.
+
 ## Supported File Types
 
 ### Security & Best Practices
@@ -331,6 +460,10 @@ AzureDevOpsTool
 │   ├── GetPullRequestChangesAsync()
 │   ├── GetPullRequestChangesCountAsync()
 │   ├── GetFileContentAsync()
+│   ├── GetPullRequestWorkItemIdsAsync()
+│   ├── GetWorkItemAsync()
+│   ├── GetWorkItemsAsync()
+│   ├── QueryWorkItemsAsync()
 │   └── TestConnectionAsync()
 │
 ├── IDiffService → DiffPlex integration
@@ -383,6 +516,34 @@ AI calls GetPullRequestInfo
 → AI summarizes title, author, status, files changed
 ```
 
+### Workflow 5: Work Item Lookup
+```
+User: "What does work item 1234 ask for?"
+
+AI calls AzureGetWorkItem with the ID
+→ Returns type, state, assignee, description, acceptance criteria
+→ AI summarizes the requirement
+```
+
+### Workflow 6: Sprint Triage
+```
+User: "Which bugs in the current sprint are still active?"
+
+AI calls AzureQueryWorkItems with a WIQL query filtering on
+[System.WorkItemType], [System.State], and @currentIteration
+→ Returns matching work items
+→ AI groups them by assignee
+```
+
+### Workflow 7: PR to Work Item Traceability
+```
+User: "Review PR 123 and tell me whether it covers its work items"
+
+AI calls AzureGetPullRequestWorkItems and ReviewPullRequest
+→ Returns linked work items plus the code review
+→ AI compares the changes against the acceptance criteria
+```
+
 ## Performance
 
 - **PR Metadata Fetch**: < 2 seconds
@@ -428,6 +589,10 @@ AI calls GetPullRequestInfo
 - Files larger than 1MB are skipped
 - Binary files are not analyzed
 - Analysis is language-specific (supported languages only)
+- Work item access is read-only; creating and updating work items is not supported
+- WIQL queries return at most 100 work items by default (configurable)
+- Rich text work item fields are returned as the HTML Azure DevOps stores, not plain text
+- Work item comments and revision history are not exposed
 
 ## Future Enhancements
 
