@@ -363,8 +363,7 @@ DrSasuMcp/
 │   ├── DrSasuMcp.AzureDevOps.csproj
 │   ├── README.md                        # Azure DevOps tool documentation
 │   └── AzureDevOps/
-│       ├── AzureDevOpsTool.cs           # MCP-exposed PR review operations
-│       ├── AzureDevOpsWorkItemTool.cs   # MCP-exposed work item operations
+│       ├── AzureDevOpsTool.cs           # MCP-exposed PR review and work item operations
 │       ├── AzureDevOpsService.cs
 │       ├── DiffService.cs
 │       ├── Models/                      # PR, FileChange, WorkItem models
