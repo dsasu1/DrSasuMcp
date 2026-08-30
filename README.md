@@ -8,7 +8,7 @@
 
 ## 🌟 Overview
 
-DrSasuMcp brings **SQL Server, PostgreSQL, and MongoDB database management**, **HTTP API testing**, **Azure DevOps PR review**, **Datadog monitoring & troubleshooting**, and **Docker container management** directly into your AI assistant conversations. Each capability is a standalone MCP server that can be deployed independently or together. Execute queries, manage schemas, test APIs, review pull requests, troubleshoot issues, monitor systems, and manage containers—all through natural language commands.
+DrSasuMcp brings **SQL Server, PostgreSQL, and MongoDB database management**, **HTTP API testing**, **Azure DevOps PR review & work items**, **Datadog monitoring & troubleshooting**, and **Docker container management** directly into your AI assistant conversations. Each capability is a standalone MCP server that can be deployed independently or together. Execute queries, manage schemas, test APIs, review pull requests, troubleshoot issues, monitor systems, and manage containers—all through natural language commands.
 
 ### Why DrSasuMcp?
 
@@ -82,7 +82,7 @@ Each of these is a standalone MCP server:
 - **DrSasuMcp.PostgreSQL** - PostgreSQL database management
 - **DrSasuMcp.MongoDB** - MongoDB database management
 - **DrSasuMcp.API** - HTTP API testing
-- **DrSasuMcp.AzureDevOps** - Pull request reviews
+- **DrSasuMcp.AzureDevOps** - Pull request reviews and work item lookups
 - **DrSasuMcp.Datadog** - Monitoring and troubleshooting
 - **DrSasuMcp.Docker** - Docker container management
 
@@ -114,8 +114,8 @@ HTTP API testing with authentication, validation, and test suites—your Postman
 
 **[📖 Full Documentation](DrSasuMcp.API/README.md)**
 
-### 🔍 Azure DevOps PR Review Tool
-Automated code review with security, quality, and best practice analysis for Azure DevOps pull requests.
+### 🔍 Azure DevOps PR Review & Work Item Tool
+Automated code review with security, quality, and best practice analysis for Azure DevOps pull requests, plus read-only work item lookups and WIQL queries.
 
 **[📖 Full Documentation](DrSasuMcp.AzureDevOps/README.md)**
 
@@ -280,10 +280,13 @@ Once configured, you can interact with the tools through natural language:
 "Check if my API at localhost:5000/health returns 200"
 ```
 
-**Azure DevOps PR Review:**
+**Azure DevOps PR Review & Work Items:**
 ```
 "Review this PR: https://dev.azure.com/org/project/_git/repo/pullrequest/123"
 "Check PR 456 for security vulnerabilities"
+"What's the status of work item 1234?"
+"List the active bugs in the Contoso project"
+"Which work items are linked to PR 123?"
 ```
 
 **Datadog Troubleshooting:**
@@ -360,12 +363,12 @@ DrSasuMcp/
 │   ├── DrSasuMcp.AzureDevOps.csproj
 │   ├── README.md                        # Azure DevOps tool documentation
 │   └── AzureDevOps/
-│       ├── AzureDevOpsTool.cs           # MCP-exposed PR review operations
+│       ├── AzureDevOpsTool.cs           # MCP-exposed PR review and work item operations
 │       ├── AzureDevOpsService.cs
 │       ├── DiffService.cs
-│       ├── Models/                      # PR, FileChange models
+│       ├── Models/                      # PR, FileChange, WorkItem models
 │       ├── Analyzers/                   # Security, Quality, BestPractices
-│       └── Utils/                       # PR URL parser
+│       └── Utils/                       # PR and work item URL parsers
 ├── DrSasuMcp.Datadog/                   # Datadog Monitoring MCP Server
 │   ├── Program.cs                       # Datadog server entry point
 │   ├── DrSasuMcp.Datadog.csproj
@@ -469,7 +472,7 @@ Each tool has comprehensive documentation with setup guides, API references, and
 - **[PostgreSQL Tool →](DrSasuMcp.PostgreSQL/README.md)** - PostgreSQL operations
 - **[MongoDB Tool →](DrSasuMcp.MongoDB/README.md)** - MongoDB operations  
 - **[API Tool →](DrSasuMcp.API/README.md)** - HTTP API testing
-- **[Azure DevOps Tool →](DrSasuMcp.AzureDevOps/README.md)** - PR reviews
+- **[Azure DevOps Tool →](DrSasuMcp.AzureDevOps/README.md)** - PR reviews and work items
 - **[Datadog Tool →](DrSasuMcp.Datadog/README.md)** - Monitoring & troubleshooting
 - **[Docker Tool →](DrSasuMcp.Docker/README.md)** - Docker container management
 - **[MCP Protocol →](https://modelcontextprotocol.io/)** - Model Context Protocol specification
@@ -505,6 +508,7 @@ Each tool implements security best practices:
 - [x] Advanced troubleshooting with root cause analysis
 - [x] Intelligent fix recommendations with impact/effort estimates
 - [x] PostgreSQL Database Tool with schema exploration and CRUD operations
+- [x] Azure DevOps work item lookups, WIQL queries, and PR work item links
 
 ### Planned Features
 - [ ] MySQL Database Tool
