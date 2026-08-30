@@ -472,7 +472,7 @@ Solution: Check Docker permissions
 
 - `Docker.DotNet` (^3.125.15) - Docker .NET client library
 - `Microsoft.Extensions.Hosting` (^10.0.11) - Hosting framework
-- `ModelContextProtocol` (^0.4.0-preview.3) - MCP server framework
+- `ModelContextProtocol` (^2.2.0) - MCP server framework
 
 ---
 

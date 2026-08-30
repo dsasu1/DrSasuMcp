@@ -4,7 +4,7 @@
 
 [![.NET Version](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![MCP Protocol](https://img.shields.io/badge/MCP-v0.4.0-green.svg)](https://modelcontextprotocol.io/)
+[![MCP Protocol](https://img.shields.io/badge/MCP-v2.2.0-green.svg)](https://modelcontextprotocol.io/)
 
 ## 🌟 Overview
 
@@ -554,7 +554,7 @@ Contributions are welcome! Please follow these guidelines:
 
 ### Project Dependencies
 
-- `ModelContextProtocol` (^0.4.0-preview.3) - MCP server framework
+- `ModelContextProtocol` (^2.2.0) - MCP server framework
 - `Microsoft.Extensions.Hosting` (^10.0.11) - Hosting and DI
 - Tool-specific packages (SQL Client, MongoDB Driver, etc.)
 
