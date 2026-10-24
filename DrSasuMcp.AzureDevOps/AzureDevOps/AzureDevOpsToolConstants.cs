@@ -139,6 +139,33 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         /// </summary>
         public const string GetPullRequestWorkItemsEndpoint = "/git/repositories/{0}/pullRequests/{1}/workitems";
 
+        /// <summary>
+        /// Endpoint to list the wikis in a project or organization.
+        /// </summary>
+        public const string GetWikisEndpoint = "/wiki/wikis";
+
+        /// <summary>
+        /// Endpoint to get a wiki page via the path query parameter.
+        /// Format: wikiIdentifier
+        /// </summary>
+        public const string GetWikiPageByPathEndpoint = "/wiki/wikis/{0}/pages";
+
+        /// <summary>
+        /// Endpoint to get a wiki page by its ID.
+        /// Format: wikiIdentifier, pageId
+        /// </summary>
+        public const string GetWikiPageByIdEndpoint = "/wiki/wikis/{0}/pages/{1}";
+
+        /// <summary>
+        /// PAT scope needed by the work item tools, quoted in authorization errors.
+        /// </summary>
+        public const string WorkItemsReadScope = "Work Items (Read)";
+
+        /// <summary>
+        /// PAT scope needed by the wiki tools, quoted in authorization errors.
+        /// </summary>
+        public const string WikiReadScope = "Wiki (Read)";
+
         // Analysis Configuration
         /// <summary>
         /// Maximum recommended method length in lines.

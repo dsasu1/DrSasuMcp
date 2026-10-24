@@ -10,7 +10,7 @@ using System.Diagnostics;
 namespace DrSasuMcp.AzureDevOps.AzureDevOps
 {
     /// <summary>
-    /// MCP tool for reviewing Azure DevOps Pull Requests and reading work items.
+    /// MCP tool for reviewing Azure DevOps Pull Requests and reading work items and wikis.
     /// </summary>
     [McpServerToolType]
     public partial class AzureDevOpsTool
@@ -635,6 +635,188 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
                 return new OperationResult(
                     success: false,
                     error: $"Failed to fetch pull request work items: {ex.Message}"
+                );
+            }
+        }
+
+        /// <summary>
+        /// Lists the wikis in a project or organization.
+        /// </summary>
+        [McpServerTool(
+            Title = "Azure: List Wikis",
+            ReadOnly = true,
+            Idempotent = true,
+            Destructive = false),
+            Description("List the Azure DevOps wikis (project wikis and published code wikis) in a project or organization, including the names used to read their pages")]
+        public async Task<OperationResult> AzureListWikis(
+            [Description("Optional: project name. Lists wikis across the organization when omitted")]
+            string? project = null,
+            [Description("Optional: organization name. Defaults to the AZURE_DEVOPS_ORG environment variable")]
+            string? organization = null,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var effectiveOrganization = organization ?? _azureDevOpsService.GetDefaultOrganization();
+                if (string.IsNullOrWhiteSpace(effectiveOrganization))
+                {
+                    return new OperationResult(
+                        success: false,
+                        error: $"Organization is required. Set the organization parameter or the {AzureDevOpsToolConstants.EnvAzureDevOpsOrg} environment variable."
+                    );
+                }
+
+                _logger.LogInformation("Listing wikis in {Organization}/{Project}", effectiveOrganization, project ?? "(organization scope)");
+
+                var wikis = await _azureDevOpsService.GetWikisAsync(effectiveOrganization, project, cancellationToken);
+
+                return new OperationResult(success: true, rowsAffected: wikis.Count, data: wikis);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogError(ex, "Authentication failed while listing wikis");
+                return new OperationResult(
+                    success: false,
+                    error: $"Authentication failed: {ex.Message}"
+                );
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "HTTP request failed while listing wikis");
+                return new OperationResult(
+                    success: false,
+                    error: $"Failed to list wikis: {ex.Message}"
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error listing wikis");
+                return new OperationResult(
+                    success: false,
+                    error: $"Failed to list wikis: {ex.Message}"
+                );
+            }
+        }
+
+        /// <summary>
+        /// Gets the markdown content of a wiki page by URL, path, or page ID.
+        /// </summary>
+        [McpServerTool(
+            Title = "Azure: Get Wiki Page",
+            ReadOnly = true,
+            Idempotent = true,
+            Destructive = false),
+            Description("Get the markdown content of an Azure DevOps wiki page by its URL, or by wiki name plus page path or page ID, optionally listing its sub-pages")]
+        public async Task<OperationResult> AzureGetWikiPage(
+            [Description("Wiki page URL (e.g. https://dev.azure.com/{org}/{project}/_wiki/wikis/{wiki}/{pageId}/{Page-Title}) or page path (e.g. /Engineering/Onboarding). Defaults to the wiki root when omitted")]
+            string? page = null,
+            [Description("Wiki name or ID, e.g. MyProject.wiki. Required unless a wiki URL is passed; use AzureListWikis to find it")]
+            string? wiki = null,
+            [Description("Project name. Required unless a wiki URL is passed")]
+            string? project = null,
+            [Description("Optional: organization name. Defaults to the AZURE_DEVOPS_ORG environment variable")]
+            string? organization = null,
+            [Description("Optional: page ID to fetch instead of a path. Ignored when a wiki URL is passed")]
+            int? pageId = null,
+            [Description("Include the paths of the page's direct sub-pages (default: false)")]
+            bool includeSubPages = false,
+            [Description("Optional: branch to read from, for code wikis published from a repository")]
+            string? version = null,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                string? urlOrganization = null;
+                string? effectiveProject = project;
+                string? effectiveWiki = wiki;
+                string? path = null;
+                var effectivePageId = pageId;
+
+                var trimmedPage = page?.Trim();
+                if (!string.IsNullOrEmpty(trimmedPage) &&
+                    trimmedPage.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parsed = WikiUrlParser.ParseWikiUrl(trimmedPage);
+                    if (parsed == null)
+                    {
+                        return new OperationResult(
+                            success: false,
+                            error: "Invalid Azure DevOps wiki URL. Expected: https://dev.azure.com/{org}/{project}/_wiki/wikis/{wiki}/{pageId}/{Page-Title} " +
+                                   "or https://dev.azure.com/{org}/{project}/_wiki/wikis/{wiki}?pagePath=/Some/Page"
+                        );
+                    }
+
+                    // Values from the URL win over explicit arguments
+                    (urlOrganization, effectiveProject, effectiveWiki, effectivePageId, path) = parsed.Value;
+                }
+                else
+                {
+                    path = trimmedPage;
+                }
+
+                if (effectivePageId is <= 0)
+                {
+                    return new OperationResult(
+                        success: false,
+                        error: "Page ID must be a positive number."
+                    );
+                }
+
+                var effectiveOrganization = urlOrganization ?? organization ?? _azureDevOpsService.GetDefaultOrganization();
+                if (string.IsNullOrWhiteSpace(effectiveOrganization))
+                {
+                    return new OperationResult(
+                        success: false,
+                        error: $"Organization is required. Pass a wiki URL, set the organization parameter, or set the {AzureDevOpsToolConstants.EnvAzureDevOpsOrg} environment variable."
+                    );
+                }
+
+                if (string.IsNullOrWhiteSpace(effectiveProject) || string.IsNullOrWhiteSpace(effectiveWiki))
+                {
+                    return new OperationResult(
+                        success: false,
+                        error: "Wiki and project are required when passing a page path or ID. Pass a wiki page URL, " +
+                               "or set the wiki and project parameters (use AzureListWikis to find wiki names)."
+                    );
+                }
+
+                _logger.LogInformation("Fetching wiki page {Page} from {Organization}/{Project}/{Wiki}",
+                    effectivePageId?.ToString() ?? path ?? "/", effectiveOrganization, effectiveProject, effectiveWiki);
+
+                var result = await _azureDevOpsService.GetWikiPageAsync(
+                    effectiveOrganization,
+                    effectiveProject,
+                    effectiveWiki,
+                    path,
+                    effectivePageId,
+                    includeSubPages,
+                    version,
+                    cancellationToken);
+
+                return new OperationResult(success: true, data: result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogError(ex, "Authentication failed while fetching wiki page");
+                return new OperationResult(
+                    success: false,
+                    error: $"Authentication failed: {ex.Message}"
+                );
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "HTTP request failed while fetching wiki page");
+                return new OperationResult(
+                    success: false,
+                    error: $"Failed to fetch wiki page: {ex.Message}"
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching wiki page");
+                return new OperationResult(
+                    success: false,
+                    error: $"Failed to fetch wiki page: {ex.Message}"
                 );
             }
         }

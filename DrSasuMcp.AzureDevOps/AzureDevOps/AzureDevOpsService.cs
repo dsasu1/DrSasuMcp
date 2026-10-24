@@ -415,6 +415,121 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         }
 
         /// <inheritdoc/>
+        public async Task<List<WikiInfo>> GetWikisAsync(
+            string organization,
+            string? project,
+            CancellationToken cancellationToken = default)
+        {
+            _logger.LogInformation("Listing wikis in {Organization}/{Project}",
+                organization, string.IsNullOrWhiteSpace(project) ? "(organization scope)" : project);
+
+            ValidateAuthentication();
+
+            var url = $"{BuildBaseUrl(organization, project)}{AzureDevOpsToolConstants.GetWikisEndpoint}" +
+                      $"?api-version={AzureDevOpsToolConstants.ApiVersion}";
+
+            var content = await GetStringAsync(url, "the wiki list", cancellationToken, AzureDevOpsToolConstants.WikiReadScope);
+            var response = JsonSerializer.Deserialize<AzureWikisResponse>(content, JsonOptions);
+
+            return (response?.value ?? new List<AzureWiki>())
+                .Select(wiki => new WikiInfo
+                {
+                    Id = wiki.id ?? string.Empty,
+                    Name = wiki.name ?? string.Empty,
+                    Type = wiki.type ?? string.Empty,
+                    ProjectId = wiki.projectId ?? string.Empty,
+                    RepositoryId = wiki.repositoryId ?? string.Empty,
+                    MappedPath = wiki.mappedPath ?? string.Empty,
+                    Versions = wiki.versions?
+                        .Select(v => v.version)
+                        .Where(v => !string.IsNullOrWhiteSpace(v))
+                        .Select(v => v!)
+                        .ToList() ?? new List<string>(),
+                    Url = wiki.remoteUrl ?? string.Empty
+                })
+                .ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<WikiPageContent> GetWikiPageAsync(
+            string organization,
+            string project,
+            string wikiIdentifier,
+            string? path,
+            int? pageId,
+            bool includeSubPages = false,
+            string? version = null,
+            CancellationToken cancellationToken = default)
+        {
+            var effectivePath = string.IsNullOrWhiteSpace(path) ? "/" : path.Trim();
+            var pageDescription = pageId.HasValue ? $"wiki page {pageId.Value}" : $"wiki page '{effectivePath}'";
+
+            _logger.LogInformation("Fetching {Page} from wiki {Wiki} in {Organization}/{Project}",
+                pageDescription, wikiIdentifier, organization, project);
+
+            ValidateAuthentication();
+
+            var baseUrl = string.Format(AzureDevOpsToolConstants.BaseUrlTemplate, organization, project);
+            var escapedWiki = Uri.EscapeDataString(wikiIdentifier);
+
+            var url = new StringBuilder(baseUrl);
+            if (pageId.HasValue)
+            {
+                url.Append(string.Format(AzureDevOpsToolConstants.GetWikiPageByIdEndpoint, escapedWiki, pageId.Value));
+                url.Append("?includeContent=true");
+            }
+            else
+            {
+                url.Append(string.Format(AzureDevOpsToolConstants.GetWikiPageByPathEndpoint, escapedWiki));
+                url.Append($"?path={Uri.EscapeDataString(effectivePath)}&includeContent=true");
+            }
+
+            if (includeSubPages)
+                url.Append("&recursionLevel=oneLevel");
+
+            if (!string.IsNullOrWhiteSpace(version))
+                url.Append($"&versionDescriptor.version={Uri.EscapeDataString(version.Trim())}&versionDescriptor.versionType=branch");
+
+            url.Append($"&api-version={AzureDevOpsToolConstants.ApiVersion}");
+
+            var content = await GetStringAsync(url.ToString(), pageDescription, cancellationToken, AzureDevOpsToolConstants.WikiReadScope);
+            var page = JsonSerializer.Deserialize<AzureWikiPageResponse>(content, JsonOptions);
+
+            if (page == null)
+                throw new InvalidOperationException("Failed to deserialize wiki page response");
+
+            var (pageContent, truncated) = TruncateToByteLimit(page.content ?? string.Empty, _maxFileSizeBytes);
+            if (truncated)
+            {
+                _logger.LogWarning("Wiki page {Path} exceeds max size limit ({MaxBytes} bytes), content truncated",
+                    page.path, _maxFileSizeBytes);
+            }
+
+            return new WikiPageContent
+            {
+                Id = page.id,
+                Path = page.path ?? effectivePath,
+                Content = pageContent,
+                ContentTruncated = truncated,
+                WikiName = wikiIdentifier,
+                ProjectName = project,
+                Organization = organization,
+                GitItemPath = page.gitItemPath ?? string.Empty,
+                IsParentPage = page.isParentPage,
+                Url = page.remoteUrl ?? string.Empty,
+                SubPages = (page.subPages ?? new List<AzureWikiPageResponse>())
+                    .Select(subPage => new WikiPageSummary
+                    {
+                        Id = subPage.id,
+                        Path = subPage.path ?? string.Empty,
+                        IsParentPage = subPage.isParentPage,
+                        Url = subPage.remoteUrl ?? string.Empty
+                    })
+                    .ToList()
+            };
+        }
+
+        /// <inheritdoc/>
         public string? GetDefaultOrganization() =>
             string.IsNullOrWhiteSpace(_defaultOrganization) ? null : _defaultOrganization;
 
@@ -492,17 +607,25 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
         /// <summary>
         /// Issues a GET request and returns the response body, translating failures into descriptive exceptions.
         /// </summary>
-        private async Task<string> GetStringAsync(string url, string description, CancellationToken cancellationToken)
+        private async Task<string> GetStringAsync(
+            string url,
+            string description,
+            CancellationToken cancellationToken,
+            string requiredScope = AzureDevOpsToolConstants.WorkItemsReadScope)
         {
             _logger.LogDebug("Requesting {Description} from {Url}", description, url);
 
             using var response = await _httpClient.GetAsync(url, cancellationToken);
-            await EnsureSuccessAsync(response, description, cancellationToken);
+            await EnsureSuccessAsync(response, description, cancellationToken, requiredScope);
 
             return await response.Content.ReadAsStringAsync(cancellationToken);
         }
 
-        private async Task EnsureSuccessAsync(HttpResponseMessage response, string description, CancellationToken cancellationToken)
+        private async Task EnsureSuccessAsync(
+            HttpResponseMessage response,
+            string description,
+            CancellationToken cancellationToken,
+            string requiredScope = AzureDevOpsToolConstants.WorkItemsReadScope)
         {
             if (response.IsSuccessStatusCode)
                 return;
@@ -517,13 +640,13 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             {
                 throw new UnauthorizedAccessException(
                     $"Azure DevOps denied access to {description} ({(int)response.StatusCode} {response.StatusCode}). " +
-                    $"Verify the {AzureDevOpsToolConstants.EnvAzureDevOpsPat} token is valid and has Work Items (Read) scope. {detail}".TrimEnd());
+                    $"Verify the {AzureDevOpsToolConstants.EnvAzureDevOpsPat} token is valid and has {requiredScope} scope. {detail}".TrimEnd());
             }
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 throw new HttpRequestException(
-                    $"Azure DevOps could not find {description}. Check the ID, organization, and project. {detail}".TrimEnd());
+                    $"Azure DevOps could not find {description}. Check the identifier, organization, and project. {detail}".TrimEnd());
             }
 
             throw new HttpRequestException(
@@ -792,6 +915,24 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             };
         }
 
+        /// <summary>
+        /// Cuts text down to at most <paramref name="maxBytes"/> UTF-8 bytes without splitting a character.
+        /// </summary>
+        private static (string text, bool truncated) TruncateToByteLimit(string text, int maxBytes)
+        {
+            if (Encoding.UTF8.GetByteCount(text) <= maxBytes)
+                return (text, false);
+
+            var bytes = Encoding.UTF8.GetBytes(text);
+            var length = Math.Max(0, maxBytes);
+
+            // Step back over continuation bytes so the cut lands on a character boundary
+            while (length > 0 && (bytes[length] & 0xC0) == 0x80)
+                length--;
+
+            return (Encoding.UTF8.GetString(bytes, 0, length), true);
+        }
+
         private void ValidateAuthentication()
         {
             if (string.IsNullOrWhiteSpace(_personalAccessToken))
@@ -958,6 +1099,40 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             public string? rel { get; set; }
             public AzureWorkItemRef? source { get; set; }
             public AzureWorkItemRef? target { get; set; }
+        }
+
+        private class AzureWikisResponse
+        {
+            public List<AzureWiki> value { get; set; } = new();
+        }
+
+        private class AzureWiki
+        {
+            public string? id { get; set; }
+            public string? name { get; set; }
+            public string? type { get; set; }
+            public string? projectId { get; set; }
+            public string? repositoryId { get; set; }
+            public string? mappedPath { get; set; }
+            public string? remoteUrl { get; set; }
+            public List<AzureWikiVersion>? versions { get; set; }
+        }
+
+        private class AzureWikiVersion
+        {
+            public string? version { get; set; }
+        }
+
+        private class AzureWikiPageResponse
+        {
+            public int? id { get; set; }
+            public string? path { get; set; }
+            public string? content { get; set; }
+            public string? gitItemPath { get; set; }
+            public string? remoteUrl { get; set; }
+            public bool isParentPage { get; set; }
+            public int? order { get; set; }
+            public List<AzureWikiPageResponse>? subPages { get; set; }
         }
 
         #endregion

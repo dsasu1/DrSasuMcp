@@ -7,6 +7,7 @@ using Xunit;
 
 namespace DrSasuMcp.Tests.AzureDevOps
 {
+    [Collection(EnvironmentVariableCollection.Name)]
     public class AzureDevOpsServiceWorkItemTests : IDisposable
     {
         private const string SingleWorkItemJson = """
