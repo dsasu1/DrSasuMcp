@@ -34,6 +34,12 @@ It also gives AI assistants read-only access to work items by:
 - **WIQL Queries** - Flat, tree, and one-hop queries with a configurable result limit
 - **PR Traceability** - The work items linked to a pull request
 
+### 📚 Wiki Access
+- **Wiki Discovery** - Project wikis and published code wikis, with their names and branches
+- **Page Content** - The markdown of any page, by URL, path, or page ID
+- **Sub-Pages** - The direct children of a page, for navigating the hierarchy
+- **Code Wiki Branches** - Read a code wiki page from a specific branch
+
 ### 🛡️ Security Analysis
 - Hardcoded credentials detection (passwords, API keys, tokens)
 - SQL injection vulnerability detection
@@ -257,6 +263,54 @@ Calls: AzureGetPullRequestWorkItems(
 )
 ```
 
+### 8. `AzureListWikis`
+Lists the wikis in a project, or across the organization when no project is given.
+
+**Parameters:**
+- `project` (optional): Project name
+- `organization` (optional): Organization name. Defaults to `AZURE_DEVOPS_ORG`
+
+**Returns:** Each wiki's `name` (used as the `wiki` parameter below), `type` (`projectWiki` or `codeWiki`), repository, mapped path, published branches (`versions`), and URL
+
+**Example Usage:**
+```
+AI: "What wikis does the Platform project have?"
+
+Calls: AzureListWikis(project: "Platform")
+```
+
+### 9. `AzureGetWikiPage`
+Gets the markdown content of a wiki page.
+
+**Parameters:**
+- `page` (optional): A wiki page URL, or a page path such as `/Engineering/Onboarding`. Defaults to the wiki root
+- `wiki` (optional): Wiki name or ID, e.g. `Platform.wiki`. Required unless `page` is a URL
+- `project` (optional): Project name. Required unless `page` is a URL
+- `organization` (optional): Organization name. Defaults to `AZURE_DEVOPS_ORG`
+- `pageId` (optional): Page ID to fetch instead of a path. Ignored when `page` is a URL
+- `includeSubPages` (optional): Include the page's direct sub-pages (default: false)
+- `version` (optional): Branch to read from, for code wikis
+
+**Returns:** Page `id`, `path`, markdown `content`, `contentTruncated`, `gitItemPath`, `isParentPage`, `url`, and `subPages` when requested
+
+**Example Usage:**
+```
+AI: "Summarize our onboarding wiki page"
+
+Calls: AzureGetWikiPage(
+  page: "https://dev.azure.com/org/Platform/_wiki/wikis/Platform.wiki/42/Onboarding"
+)
+
+Calls: AzureGetWikiPage(
+  page: "/Engineering",
+  wiki: "Platform.wiki",
+  project: "Platform",
+  includeSubPages: true
+)
+```
+
+Content larger than `AZURE_DEVOPS_MAX_FILE_SIZE` is cut at that limit and flagged with `contentTruncated: true`.
+
 ## Configuration
 
 ### Environment Variables
@@ -268,9 +322,9 @@ AZURE_DEVOPS_PAT=your_personal_access_token
 
 #### Optional
 ```bash
-AZURE_DEVOPS_ORG=your_organization          # Default organization for work item tools when no URL is supplied
+AZURE_DEVOPS_ORG=your_organization          # Default organization for work item and wiki tools when no URL is supplied
 AZURE_DEVOPS_MAX_FILES=100                  # Max files to analyze per PR (default: 100)
-AZURE_DEVOPS_MAX_FILE_SIZE=1048576          # Max file size in bytes to fetch (default: 1MB). Files exceeding this are skipped.
+AZURE_DEVOPS_MAX_FILE_SIZE=1048576          # Max file size in bytes to fetch (default: 1MB). Files exceeding this are skipped; wiki pages are truncated.
 AZURE_DEVOPS_MAX_WORK_ITEMS=100             # Max work items returned by a WIQL query (default: 100)
 AZURE_DEVOPS_TIMEOUT=60                     # Request timeout in seconds (default: 60)
 ```
@@ -283,6 +337,7 @@ AZURE_DEVOPS_TIMEOUT=60                     # Request timeout in seconds (defaul
    - ✅ **Code** (Read)
    - ✅ **Pull Request Threads** (Read)
    - ✅ **Work Items** (Read) - required for the work item tools
+   - ✅ **Wiki** (Read) - required for the wiki tools
 4. Copy the token
 5. Set environment variable:
    ```bash
@@ -390,6 +445,21 @@ https://{organization}.visualstudio.com/{project}/_workitems/edit/{id}
 
 When a URL is supplied, the organization and project it contains take precedence over the
 `organization` and `project` parameters.
+
+## Supported Wiki URL Formats
+
+`AzureGetWikiPage` accepts page URLs copied from the browser, on either host:
+
+```
+https://dev.azure.com/{organization}/{project}/_wiki/wikis/{wiki}/{pageId}/{Page-Title}
+https://dev.azure.com/{organization}/{project}/_wiki/wikis/{wiki}/{pageId}
+https://dev.azure.com/{organization}/{project}/_wiki/wikis/{wiki}?pagePath=/Some/Page
+https://dev.azure.com/{organization}/{project}/_wiki/wikis/{wiki}
+https://{organization}.visualstudio.com/{project}/_wiki/wikis/{wiki}/{pageId}/{Page-Title}
+```
+
+A `pagePath` query parameter wins over a page ID, and a URL without either points at the wiki root.
+Values in the URL take precedence over the `organization`, `project`, `wiki`, and `pageId` parameters.
 
 ## Supported File Types
 
@@ -544,6 +614,16 @@ AI calls AzureGetPullRequestWorkItems and ReviewPullRequest
 → AI compares the changes against the acceptance criteria
 ```
 
+### Workflow 8: Wiki Research
+```
+User: "How do we deploy the billing service? It's somewhere in our wiki."
+
+AI calls AzureListWikis to find the wiki name
+→ AI calls AzureGetWikiPage on the root with includeSubPages
+→ AI follows the relevant sub-page paths and reads their content
+→ AI answers from the documentation, linking the page URLs
+```
+
 ## Performance
 
 - **PR Metadata Fetch**: < 2 seconds
@@ -593,6 +673,7 @@ AI calls AzureGetPullRequestWorkItems and ReviewPullRequest
 - WIQL queries return at most 100 work items by default (configurable)
 - Rich text work item fields are returned as the HTML Azure DevOps stores, not plain text
 - Work item comments and revision history are not exposed
+- Wiki access is read-only; wiki search, attachments, and page history are not supported
 
 ## Future Enhancements
 

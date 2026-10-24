@@ -143,6 +143,40 @@ namespace DrSasuMcp.AzureDevOps.AzureDevOps
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Lists the wikis in a project, or across the organization when no project is given.
+        /// </summary>
+        /// <param name="organization">The Azure DevOps organization name.</param>
+        /// <param name="project">The project name, or null for organization scope.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>The wikis visible to the caller.</returns>
+        Task<List<WikiInfo>> GetWikisAsync(
+            string organization,
+            string? project,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Gets a wiki page and its markdown content, by path or by page ID.
+        /// </summary>
+        /// <param name="organization">The Azure DevOps organization name.</param>
+        /// <param name="project">The project name.</param>
+        /// <param name="wikiIdentifier">The wiki name or ID.</param>
+        /// <param name="path">The page path, e.g. /Engineering/Onboarding. Ignored when a page ID is given.</param>
+        /// <param name="pageId">The page ID, or null to look the page up by path.</param>
+        /// <param name="includeSubPages">Whether to include the page's direct sub-pages.</param>
+        /// <param name="version">Optional branch to read from, for code wikis.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>The wiki page.</returns>
+        Task<WikiPageContent> GetWikiPageAsync(
+            string organization,
+            string project,
+            string wikiIdentifier,
+            string? path,
+            int? pageId,
+            bool includeSubPages = false,
+            string? version = null,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Tests the connection to Azure DevOps using the configured PAT.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token.</param>

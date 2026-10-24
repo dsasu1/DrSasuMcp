@@ -39,7 +39,7 @@ namespace DrSasuMcp.Tests.AzureDevOps.TestHelpers
                 ? null
                 : await request.Content.ReadAsStringAsync(cancellationToken);
 
-            Requests.Add(new RecordedRequest(request.Method, request.RequestUri?.ToString() ?? string.Empty, body));
+            Requests.Add(new RecordedRequest(request.Method, request.RequestUri?.AbsoluteUri ?? string.Empty, body));
 
             var rule = _rules.FirstOrDefault(r => r.Predicate(request));
             if (rule == null)
